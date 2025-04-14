@@ -1,0 +1,162 @@
+body {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #28a745;
+}
+
+canvas {
+    background-color: #ffffff;
+    border: 2px solid #000000;
+}
+
+.waiting-player {
+    opacity: 0.7;
+    filter: grayscale(50%);
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #1a1a1a;
+    font-family: 'Arial', sans-serif;
+    color: white;
+    overflow: hidden;
+}
+
+#game-ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border-radius: 10px;
+    z-index: 100;
+}
+
+#timer {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    color: #ffffff;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+#waiting-screen {
+    font-size: 18px;
+    color: #ffffff;
+    text-align: center;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 5px;
+    max-width: 250px;
+}
+
+#winner-display {
+    font-size: 24px;
+    font-weight: bold;
+    color: gold;
+    text-align: center;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+    margin: 10px 0;
+    transition: opacity 0.5s ease;
+    opacity: 0;
+    display: none;
+}
+
+#restart-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin-top: 10px;
+}
+
+#restart-button:hover {
+    background-color: #45a049;
+}
+
+canvas {
+    display: block;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Estilo para os IDs dos jogadores */
+.player-id {
+    position: absolute;
+    font-size: 10px;
+    color: white;
+    text-shadow: 1px 1px 1px black;
+    pointer-events: none;
+}
+
+#winner-display {
+    /* Mantenha as propriedades existentes e adicione: */
+    transition: opacity 0.5s ease;
+    opacity: 1;
+}
+
+#winner-display.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#game-ui {
+    z-index: 100;
+}
+
+canvas {
+    z-index: 10;
+}
+
+.player-id {
+    z-index: 50;
+    position: absolute;
+    font-size: 12px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px black;
+    pointer-events: none;
+    transform: translate(-50%, 0);
+    white-space: nowrap;
+}
+
+
+#winner-display.show {
+    opacity: 1;
+    display: block;
+}
+
+
+.player-id.my-player {
+    color: #ffff00; /* Amarelo brilhante */
+    font-size: 14px;
+    font-weight: bolder;
+    text-shadow: 
+        0 0 5px #000000,
+        0 0 10px #ffff00;
+}
+
+@keyframes pulse {
+    0% { transform: translate(-50%, 0) scale(1); }
+    50% { transform: translate(-50%, 0) scale(1.1); }
+    100% { transform: translate(-50%, 0) scale(1); }
+}
+
+.player-id.my-player {
+    animation: pulse 1.5s infinite;
+}
+
