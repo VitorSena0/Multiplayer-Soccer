@@ -6,10 +6,8 @@ const app = express();
 const server = http.createServer(app);
 const io = socketio(server, {
     cors: {
-      origin: ["https://seu-frontend.com", "http://localhost:3000"], // Adicione o domínio do seu frontend
-      methods: ["GET", "POST"],
-      transports: ['websocket', 'polling'], // Adicione esta linha
-      credentials: true
+      origin: "*", // Adicione o domínio do seu frontend
+      methods: ["GET", "POST"]
     },
     allowEIO3: true // Adicione para compatibilidade
   });
@@ -223,6 +221,11 @@ io.on('connection', (socket) => {
     // Verifica se pode começar
     checkRestartConditions();
 
+    // Envia ping regularmente para o cliente
+    socket.on('clientPing', (clientTime) => {
+        socket.emit('serverPong', clientTime);
+    });
+
     socket.on('requestRestart', () => {
         if (Game.waitingForRestart) {
             Game.playersReady.add(socket.id);
@@ -396,6 +399,6 @@ let gameInterval = setInterval(gameLoop, 1000 / 60);
 let timerInterval = setInterval(updateTimer, 1000);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });

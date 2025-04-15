@@ -15,8 +15,13 @@ const GOAL_WIDTH = 50;
 let matchEnded = false;
 let canMove = false;
 let currentTeam = 'spectator';
-const inputs = { left: false, right: false, up: false, down: false };
-
+const inputs = { 
+  left: false, 
+  right: false, 
+  up: false, 
+  down: false,
+  action: false // Novo input para ações
+};
 // Elementos da UI
 const gameUIContainer = document.createElement('div');
 gameUIContainer.id = 'game-ui';
@@ -70,6 +75,46 @@ socket.on('init', (data) => {
   };
   canMove = data.canMove;
   updateUI();
+});
+
+// Inicie o monitoramento de ping quando a conexão for estabelecida
+socket.on('connect', () => {
+    // Limpa intervalo anterior se existir
+    if (pingInterval) clearInterval(pingInterval);
+    
+    // Novo intervalo de ping a cada segundo
+    pingInterval = setInterval(() => {
+        pingStartTime = Date.now();
+        socket.emit('clientPing', pingStartTime);
+    }, 1000);
+});
+
+// Handler para a resposta do servidor
+socket.on('serverPong', (clientTime) => {
+    playerLatency = Date.now() - clientTime;
+    updateLatencyDisplay();
+});
+
+// Função para atualizar o display
+function updateLatencyDisplay() {
+    const latencyElement = document.getElementById('latency-display');
+    if (!latencyElement) return;
+    
+    latencyElement.textContent = `Ping: ${playerLatency}ms`;
+    
+    // Código de cores
+    if (playerLatency < 100) {
+        latencyElement.style.color = '#00ff00';
+    } else if (playerLatency < 200) {
+        latencyElement.style.color = '#ffff00';
+    } else {
+        latencyElement.style.color = '#ff0000';
+    }
+}
+
+// Desative o ping quando desconectar
+socket.on('disconnect', () => {
+    if (pingInterval) clearInterval(pingInterval);
 });
 
 // Conexão de jogador
@@ -231,28 +276,268 @@ function updateUI() {
 }
 
 function updatePlayerIDs() {
-    // Remove todos os IDs antigos
-    document.querySelectorAll('.player-id').forEach(el => el.remove());
-    
-    // Adiciona novos IDs
-    for (const [id, player] of Object.entries(gameState.players)) {
-        if (player) {
-            const idElement = document.createElement('div');
-            idElement.className = 'player-id';
-            idElement.textContent = id.substring(0, 5);
-            
-            // Destaca o jogador atual
-            if (id === socket.id) {
-                idElement.classList.add('my-player');
-            }
-            
-            // Posiciona o elemento
-            idElement.style.left = `${player.x - 10 + canvas.offsetLeft}px`;
-            idElement.style.top = `${player.y - PLAYER_RADIUS - 5 + canvas.offsetTop}px`;
-            document.body.appendChild(idElement);
-        }
-    }
+  // Remove todos os IDs antigos
+  document.querySelectorAll('.player-id').forEach(el => el.remove());
+  
+  // Adiciona novos IDs
+  for (const [id, player] of Object.entries(gameState.players)) {
+      if (player) {
+          const idElement = document.createElement('div');
+          idElement.className = 'player-id';
+          idElement.textContent = id.substring(0, 5);
+          
+          // Destaca o jogador atual
+          if (id === socket.id) {
+              idElement.classList.add('my-player');
+          }
+          
+          // Posiciona o elemento
+          const canvasRect = canvas.getBoundingClientRect();
+          idElement.style.position = 'absolute';
+          idElement.style.left = `${canvasRect.left + player.x - 10}px`;
+          idElement.style.top = `${canvasRect.top + player.y - PLAYER_RADIUS - 20}px`;
+          idElement.style.zIndex = '10'; // Garante que fique acima do canvas
+          document.body.appendChild(idElement);
+      }
+  }
 }
+
+// Detecção de dispositivo móvel melhorada
+function isMobileDevice() {
+  return (('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0) ||
+      (navigator.msMaxTouchPoints > 0));
+}
+
+// Controles para todos os dispositivos
+function setupControls() {
+  const joystickThumb = document.getElementById('joystick-thumb');
+  const joystickBase = document.getElementById('joystick-base');
+  const actionBtn = document.getElementById('action-btn');
+  
+  let activeTouchId = null;
+  let isMouseDown = false;
+  const joystickRadius = 60;
+  const centerPosition = { x: 60, y: 60 };
+
+  // Controles Touch
+  joystickBase.addEventListener('touchstart', handleControlStart);
+  document.addEventListener('touchmove', handleControlMove);
+  document.addEventListener('touchend', handleControlEnd);
+
+  // Controles Mouse
+  joystickBase.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      handleControlStart({
+          clientX: e.clientX,
+          clientY: e.clientY,
+          preventDefault: () => {}
+      });
+  });
+
+  document.addEventListener('mousemove', (e) => {
+      if (isMouseDown) {
+          handleControlMove({
+              changedTouches: [{
+                  clientX: e.clientX,
+                  clientY: e.clientY
+              }],
+              preventDefault: () => {}
+          });
+      }
+  });
+
+  document.addEventListener('mouseup', () => {
+      if (isMouseDown) {
+          isMouseDown = false;
+          handleControlEnd();
+      }
+  });
+
+  function handleControlStart(e) {
+      if (activeTouchId !== null) return;
+      activeTouchId = 'mouse'; // Usamos 'mouse' como identificador
+      updateJoystickPosition(e);
+      e.preventDefault();
+  }
+
+  function handleControlMove(e) {
+      if (activeTouchId === null) return;
+      updateJoystickPosition(e.changedTouches[0]);
+      e.preventDefault();
+  }
+
+  function handleControlEnd() {
+      resetJoystick();
+  }
+
+  function updateJoystickPosition(touch) {
+      const rect = joystickBase.getBoundingClientRect();
+      const centerX = rect.left + joystickRadius;
+      const centerY = rect.top + joystickRadius;
+      
+      const touchX = touch.clientX - centerX;
+      const touchY = touch.clientY - centerY;
+      
+      const distance = Math.sqrt(touchX * touchX + touchY * touchY);
+      const angle = Math.atan2(touchY, touchX);
+      
+      const limitedDistance = Math.min(distance, joystickRadius);
+      const newX = Math.cos(angle) * limitedDistance;
+      const newY = Math.sin(angle) * limitedDistance;
+      
+      joystickThumb.style.transform = `translate(${newX}px, ${newY}px)`;
+      
+      // Atualiza inputs
+      const normalizedX = newX / joystickRadius;
+      const normalizedY = newY / joystickRadius;
+      
+      inputs.left = normalizedX < -0.3;
+      inputs.right = normalizedX > 0.3;
+      inputs.up = normalizedY < -0.3;
+      inputs.down = normalizedY > 0.3;
+  }
+
+  function resetJoystick() {
+      joystickThumb.style.transform = 'translate(0, 0)';
+      activeTouchId = null;
+      inputs.left = false;
+      inputs.right = false;
+      inputs.up = false;
+      inputs.down = false;
+  }
+
+  // Botão de Ação
+  const handleActionStart = () => inputs.action = true;
+  const handleActionEnd = () => inputs.action = false;
+
+  actionBtn.addEventListener('touchstart', handleActionStart);
+  actionBtn.addEventListener('touchend', handleActionEnd);
+  actionBtn.addEventListener('mousedown', handleActionStart);
+  actionBtn.addEventListener('mouseup', handleActionEnd);
+  actionBtn.addEventListener('mouseleave', handleActionEnd); // Caso o mouse sair do botão
+}
+
+// Inicializa controles quando o jogo carregar
+window.addEventListener('load', () => {
+  setupControls();
+  
+  // Ajusta o tamanho do canvas para deixar espaço para os controles
+  const canvas = document.querySelector('canvas');
+  const controlsHeight = document.getElementById('mobile-controls').offsetHeight;
+  canvas.style.marginBottom = `${controlsHeight + 20}px`;
+});
+
+// Ajusta tamanho dos controles para telas pequenas
+function resizeControls() {
+  if (!isMobileDevice()) return;
+  
+  const screenWidth = window.innerWidth;
+  const scale = Math.min(1, screenWidth / 400);
+  
+  const controls = document.getElementById('mobile-controls');
+  controls.style.transform = `scale(${scale})`;
+}
+
+// Inicializa quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  setupMobileControls();
+  
+  // Garante que o canvas não cubra os controles
+  const canvas = document.querySelector('canvas');
+  canvas.style.zIndex = '1';
+});
+
+function setupMobileControls() {
+  // Verifica se é mobile
+  if (!/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+      return;
+  }
+
+  const joystickThumb = document.getElementById('joystick-thumb');
+  const joystickBase = document.getElementById('joystick-base');
+  const actionBtn = document.getElementById('action-btn');
+  
+  let activeTouchId = null;
+  const joystickRadius = 60;
+  const centerPosition = { x: 60, y: 60 };
+
+  // Controle do Joystick
+  joystickBase.addEventListener('touchstart', (e) => {
+      if (activeTouchId !== null) return;
+      
+      const touch = e.changedTouches[0];
+      activeTouchId = touch.identifier;
+      updateJoystickPosition(touch);
+      e.preventDefault();
+  });
+
+  document.addEventListener('touchmove', (e) => {
+      if (activeTouchId === null) return;
+      
+      const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
+      if (touch) {
+          updateJoystickPosition(touch);
+          e.preventDefault();
+      }
+  });
+
+  document.addEventListener('touchend', (e) => {
+      const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
+      if (touch) {
+          resetJoystick();
+          e.preventDefault();
+      }
+  });
+
+  function updateJoystickPosition(touch) {
+      const rect = joystickBase.getBoundingClientRect();
+      const centerX = rect.left + joystickRadius;
+      const centerY = rect.top + joystickRadius;
+      
+      const touchX = touch.clientX - centerX;
+      const touchY = touch.clientY - centerY;
+      
+      const distance = Math.sqrt(touchX * touchX + touchY * touchY);
+      const angle = Math.atan2(touchY, touchX);
+      
+      const limitedDistance = Math.min(distance, joystickRadius);
+      const newX = Math.cos(angle) * limitedDistance;
+      const newY = Math.sin(angle) * limitedDistance;
+      
+      joystickThumb.style.transform = `translate(${newX}px, ${newY}px)`;
+      
+      // Atualiza inputs
+      const normalizedX = newX / joystickRadius;
+      const normalizedY = newY / joystickRadius;
+      
+      inputs.left = normalizedX < -0.3;
+      inputs.right = normalizedX > 0.3;
+      inputs.up = normalizedY < -0.3;
+      inputs.down = normalizedY > 0.3;
+  }
+
+  function resetJoystick() {
+      joystickThumb.style.transform = 'translate(0, 0)';
+      activeTouchId = null;
+      inputs.left = false;
+      inputs.right = false;
+      inputs.up = false;
+      inputs.down = false;
+  }
+
+  // Botão de Ação
+  actionBtn.addEventListener('touchstart', (e) => {
+      inputs.action = true;
+      e.preventDefault();
+  });
+
+  actionBtn.addEventListener('touchend', (e) => {
+      inputs.action = false;
+      e.preventDefault();
+  });
+}
+
 
 function showWinner(winner) {
     winnerDisplay.style.display = 'block';
@@ -272,6 +557,10 @@ function updateTimerDisplay() {
   const seconds = gameState.matchTime % 60;
   timerDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
+
+
+// Inicializa controles mobile quando o jogo carregar
+window.addEventListener('load', setupMobileControls);
 
 // Controles
 window.addEventListener('keydown', (e) => {

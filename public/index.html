@@ -4,18 +4,40 @@
   <title>Multiplayer Soccer</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    /* Garante que o canvas fique centralizado */
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      overflow: hidden;
+    canvas {
+      position: relative;
+      z-index: 1; /* Canvas fica abaixo dos nomes */
+    }
+  
+    .player-id {
+      position: absolute;
+      font-size: 14px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 1px 1px 2px black;
+      pointer-events: none; /* Evita interferência com cliques */
+      z-index: 10; /* Nomes ficam acima do canvas */
+    }
+  
+    .my-player {
+      color: yellow; /* Destaque para o jogador atual */
     }
   </style>
 </head>
 <body>
+  <div id="latency-display" class="latency-display">Ping: 0ms</div>
+  <div id="mobile-controls">
+    <div id="joystick-container">
+        <div id="joystick-base">
+            <div id="joystick-thumb"></div>
+        </div>
+    </div>
+    
+    <div id="action-buttons">
+        <div class="action-btn" id="action-btn">A</div>
+        <div class="action-btn" id="kick-btn">⚽</div>
+    </div>
+</div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>
 </body>
