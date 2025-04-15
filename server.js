@@ -222,9 +222,9 @@ io.on('connection', (socket) => {
     checkRestartConditions();
 
     // Envia ping regularmente para o cliente
-    socket.on('clientPing', (clientTime) => {
-        socket.emit('serverPong', clientTime);
-    });
+    setInterval(() => {
+        socket.emit('ping', Date.now());
+    }, 1000); // Envia ping a cada 1 segundo
 
     socket.on('requestRestart', () => {
         if (Game.waitingForRestart) {

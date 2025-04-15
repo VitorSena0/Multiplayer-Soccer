@@ -3,29 +3,9 @@
 <head>
   <title>Multiplayer Soccer</title>
   <link rel="stylesheet" href="style.css">
-  <style>
-    canvas {
-      position: relative;
-      z-index: 1; /* Canvas fica abaixo dos nomes */
-    }
-  
-    .player-id {
-      position: absolute;
-      font-size: 14px;
-      font-weight: bold;
-      color: white;
-      text-shadow: 1px 1px 2px black;
-      pointer-events: none; /* Evita interferência com cliques */
-      z-index: 10; /* Nomes ficam acima do canvas */
-    }
-  
-    .my-player {
-      color: yellow; /* Destaque para o jogador atual */
-    }
-  </style>
+
 </head>
 <body>
-  <div id="latency-display" class="latency-display">Ping: 0ms</div>
   <div id="mobile-controls">
     <div id="joystick-container">
         <div id="joystick-base">
@@ -33,11 +13,34 @@
         </div>
     </div>
     
-    <div id="action-buttons">
-        <div class="action-btn" id="action-btn">A</div>
-        <div class="action-btn" id="kick-btn">⚽</div>
-    </div>
 </div>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Multiplayer Soccer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="mobile-controls">
+    <div id="joystick-container">
+      <div id="joystick-base">
+        <div id="joystick-thumb"></div>
+      </div>
+    </div>
+    <button id="action-btn">CHUTAR</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+  
+  <script>
+    // Mostrar controles apenas em dispositivos móveis
+    if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+      document.getElementById('mobile-controls').style.display = 'flex';
+    }
+  </script>
+</body>
+</html>
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>
 </body>
