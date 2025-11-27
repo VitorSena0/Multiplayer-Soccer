@@ -23,7 +23,8 @@ const config = {
     timer: document.createElement('div'),
     waitingScreen: document.createElement('div'),
     winnerDisplay: document.createElement('div'),
-    restartButton: document.createElement('button')
+      restartButton: document.createElement('button'),
+      roomInfo: document.createElement('div')
   };
   
   // Estado do jogo
@@ -31,18 +32,28 @@ const config = {
     matchEnded: false,
     canMove: false,
     currentTeam: 'spectator',
+      roomId: null,
+      roomCapacity: 0,
+      roomPlayerCount: 0,
+      requestedRoomId: null,
     inputs: { left: false, right: false, up: false, down: false, action: false },
     gameState: {
       players: {},
       ball: { x: 400, y: 300, radius: config.ball.radius, speedX: 0, speedY: 0 },
       score: { red: 0, blue: 0 },
       teams: { red: [], blue: [] },
-      matchTime: 180,
+        matchTime: 60,
       isPlaying: false,
       width: config.canvas.width,
       height: config.canvas.height
     }
   };
+
+    function getRequestedRoomId() {
+      const params = new URLSearchParams(window.location.search);
+      const value = params.get('room');
+      return value ? value.trim() : null;
+    }
   
   // Inicialização do canvas
   function initCanvas() {
@@ -83,6 +94,10 @@ const config = {
     elements.winnerDisplay.id = 'winner-display';
     elements.ui.appendChild(elements.winnerDisplay);
     
+    elements.roomInfo.id = 'room-info';
+    elements.roomInfo.textContent = 'Conectando a uma sala...';
+    elements.ui.appendChild(elements.roomInfo);
+    
     elements.restartButton.id = 'restart-button';
     elements.restartButton.textContent = 'Jogar Novamente';
     elements.restartButton.style.display = 'none';
@@ -90,9 +105,36 @@ const config = {
   }
   
   initUI();
+
+  state.requestedRoomId = getRequestedRoomId();
+  state.roomId = state.requestedRoomId;
+  
+  function persistRoomInUrl(roomId) {
+    if (!roomId) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('room', roomId);
+    const query = params.toString();
+    window.history.replaceState({}, '', `/${query ? `?${query}` : ''}`);
+    state.requestedRoomId = roomId;
+  }
+
+  function updateRoomInfoDisplay() {
+    if (!elements.roomInfo) return;
+    if (!state.roomId) {
+      elements.roomInfo.textContent = 'Conectando a uma sala...';
+      return;
+    }
+    const playersInRoom = state.roomPlayerCount || Object.keys(state.gameState.players).length;
+    const capacityText = state.roomCapacity ? ` (${playersInRoom}/${state.roomCapacity})` : '';
+    elements.roomInfo.textContent = `Sala ${state.roomId}${capacityText}`;
+  }
+  
+  updateRoomInfoDisplay();
   
   // Conexão com o servidor
-  const socket = io(window.location.origin);
+  const socket = io(window.location.origin, {
+    query: { roomId: state.requestedRoomId || '' }
+  });
   
   // Handlers de socket
   const socketHandlers = {
@@ -100,7 +142,29 @@ const config = {
       state.currentTeam = data.team;
       state.gameState = { ...state.gameState, ...data.gameState };
       state.canMove = data.canMove;
+      state.roomId = data.roomId || state.roomId;
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
+      if (data.roomId) {
+        persistRoomInUrl(data.roomId);
+      }
+      updateRoomInfoDisplay();
       updateUI();
+    },
+    
+    roomAssigned: (data) => {
+      state.roomId = data.roomId;
+      state.roomCapacity = data.capacity;
+      state.roomPlayerCount = data.players;
+      persistRoomInUrl(data.roomId);
+      updateRoomInfoDisplay();
+    },
+    
+    roomFull: (data) => {
+      const message = `Sala ${data.roomId} está cheia (${data.capacity} jogadores). Escolha outra sala.`;
+      elements.waitingScreen.style.display = 'block';
+      elements.waitingScreen.textContent = message;
+      state.canMove = false;
+      alert(message);
     },
     
     playerConnected: (data) => {
@@ -118,14 +182,19 @@ const config = {
       };
       state.gameState.teams = data.gameState.teams;
       state.canMove = state.gameState.teams.red.length > 0 && state.gameState.teams.blue.length > 0;
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
+      updateRoomInfoDisplay();
       updateUI();
     },
     
     update: (newState) => {
       state.gameState = { ...state.gameState, ...newState };
+      state.roomId = newState.roomId || state.roomId;
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
       state.canMove = state.gameState.isPlaying && 
         ((state.currentTeam === 'red' && state.gameState.teams.blue.length > 0) || 
          (state.currentTeam === 'blue' && state.gameState.teams.red.length > 0));
+      updateRoomInfoDisplay();
       updateUI();
     },
     
@@ -140,12 +209,16 @@ const config = {
       state.gameState = { ...state.gameState, ...data.gameState, isPlaying: true };
       state.matchEnded = false;
       state.canMove = true;
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
+      updateRoomInfoDisplay();
       hideWinner();
       updateUI();
     },
     
     playerReadyUpdate: (data) => {
       state.gameState.players = data.players;
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
+      updateRoomInfoDisplay();
       if (state.matchEnded) {
         const readyText = `Prontos: ${data.readyCount}/${data.totalPlayers}`;
         elements.waitingScreen.textContent = state.currentTeam === 'spectator' 
@@ -175,6 +248,8 @@ const config = {
     playerDisconnected: (data) => {
       state.gameState = data.gameState;
       delete state.gameState.players[data.playerId];
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
+      updateRoomInfoDisplay();
       updateUI();
       if (state.matchEnded && state.gameState.teams.red.length > 0 && state.gameState.teams.blue.length > 0) {
         socket.emit('requestRestart');
@@ -185,6 +260,8 @@ const config = {
       state.gameState.isPlaying = false;
       state.matchEnded = true;
       state.gameState.players = data.gameState.players;
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
+      updateRoomInfoDisplay();
       showWinner(data.winner);
       elements.restartButton.style.display = 'block';
       elements.waitingScreen.textContent = 'Partida terminada. Aguardando todos jogadores...';
@@ -197,7 +274,12 @@ const config = {
     },
     
     waitingForPlayers: (data) => {
-      console.log(`Status: ${data.redCount} jogador(es) red, ${data.blueCount} jogador(es) blue`);
+      const waitingText = `Aguardando jogadores... Vermelho: ${data.redCount} | Azul: ${data.blueCount}`;
+      elements.waitingScreen.textContent = waitingText;
+      elements.waitingScreen.style.display = 'block';
+      state.canMove = false;
+      state.roomPlayerCount = data.redCount + data.blueCount;
+      updateRoomInfoDisplay();
       updateUI();
     },
     
@@ -219,6 +301,7 @@ const config = {
   
   // Funções de UI
   function updateUI() {
+    updateRoomInfoDisplay();
     if (state.matchEnded) {
       elements.waitingScreen.style.display = 'block';
       elements.waitingScreen.textContent = 'Partida terminada. Aguardando todos jogadores...\n';

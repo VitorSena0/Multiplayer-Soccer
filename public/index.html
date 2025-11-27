@@ -1,47 +1,27 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>Multiplayer Soccer</title>
-  <link rel="stylesheet" href="style.css">
-
-</head>
-<body>
-  <div id="mobile-controls">
-    <div id="joystick-container">
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multiplayer Soccer</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="mobile-controls">
+      <div id="joystick-container">
         <div id="joystick-base">
-            <div id="joystick-thumb"></div>
+          <div id="joystick-thumb"></div>
         </div>
-    </div>
-    
-</div>
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Multiplayer Soccer</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div id="mobile-controls">
-    <div id="joystick-container">
-      <div id="joystick-base">
-        <div id="joystick-thumb"></div>
       </div>
+      <button id="action-btn">CHUTAR</button>
     </div>
-    <button id="action-btn">CHUTAR</button>
-  </div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js"></script>
-  
-  <script>
-    // Mostrar controles apenas em dispositivos móveis
-    if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
-      document.getElementById('mobile-controls').style.display = 'flex';
-    }
-  </script>
-</body>
-</html>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js"></script>
-</body>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/game.js"></script>
+    <script>
+      if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+        document.getElementById('mobile-controls').style.display = 'flex';
+      }
+    </script>
+  </body>
 </html>

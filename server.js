@@ -6,11 +6,12 @@ const app = express();
 const server = http.createServer(app);
 const io = socketio(server, {
     cors: {
-      origin: "*", // Adicione o domínio do seu frontend
-      methods: ["GET", "POST"]
+        origin: '*',
+        methods: ['GET', 'POST'],
     },
-    allowEIO3: true // Adicione para compatibilidade
-  });
+    allowEIO3: true,
+});
+
 app.use(express.static('public'));
 
 // Constantes do jogo
@@ -18,385 +19,444 @@ const PLAYER_RADIUS = 20;
 const BALL_RADIUS = 10;
 const GOAL_HEIGHT = 200;
 const GOAL_WIDTH = 50;
-const MATCH_DURATION = 60; // 3 minutos em segundos
+const MATCH_DURATION = 60;
+const MAX_PLAYERS_PER_ROOM = 6;
 
-// Configuração do jogo
-const Game = {
-    width: 800,
-    height: 600,
-    players: {},
-    ball: { x: 400, y: 300, radius: 10, speedX: 0, speedY: 0 },
-    score: { red: 0, blue: 0 },
-    teams: { red: [], blue: [] },
-    maxPlayers: 5,
-    matchTime: MATCH_DURATION,
-    isPlaying: false,
-    waitingPlayers: [],
-    isResettingBall: false,
-    nextBallPosition: null,
-    ballResetInProgress: false,
-    lastGoalTime: 0,
-    goalCooldown: 500, // ms
-    waitingForRestart: false,
-    playersReady: new Set()
-};
+const rooms = new Map();
+let roomSequence = 1;
 
-function resetBall(direction) {
-    const thirdWidth = Game.width / 3;
-    const minX = Game.width / 2 - thirdWidth / 2;
-    const maxX = Game.width / 2 + thirdWidth / 2;
-    const thirdHeight = Game.height / 3;
-    const minY = Game.height / 2 - thirdHeight / 2;
-    const maxY = Game.height / 2 + thirdHeight / 2;
+const defaultBallState = () => ({
+    x: 400,
+    y: 300,
+    radius: BALL_RADIUS,
+    speedX: 0,
+    speedY: 0,
+});
 
-    Game.ball = {
+function sanitizeRoomId(roomId) {
+    if (typeof roomId !== 'string') return null;
+    const trimmed = roomId.trim().toLowerCase();
+    if (!trimmed) return null;
+    const normalized = trimmed
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-_]/g, '')
+        .slice(0, 32);
+    return normalized || null;
+}
+
+function generateRoomId() {
+    let candidate;
+    do {
+        candidate = `room-${roomSequence++}`;
+    } while (rooms.has(candidate));
+    return candidate;
+}
+
+function createRoom(roomId = generateRoomId()) {
+    const id = rooms.has(roomId) ? generateRoomId() : roomId;
+    const roomState = {
+        id,
+        width: 800,
+        height: 600,
+        players: {},
+        ball: defaultBallState(),
+        score: { red: 0, blue: 0 },
+        teams: { red: [], blue: [] },
+        matchTime: MATCH_DURATION,
+        isPlaying: false,
+        isResettingBall: false,
+        nextBallPosition: null,
+        ballResetInProgress: false,
+        lastGoalTime: 0,
+        goalCooldown: 500,
+        waitingForRestart: false,
+        playersReady: new Set(),
+    };
+    rooms.set(id, roomState);
+    console.log(`Sala criada: ${id}`);
+    return roomState;
+}
+
+function getPlayerCount(room) {
+    return Object.keys(room.players).length;
+}
+
+function getOrCreateAvailableRoom() {
+    for (const room of rooms.values()) {
+        if (getPlayerCount(room) < MAX_PLAYERS_PER_ROOM) {
+            return room;
+        }
+    }
+    return createRoom();
+}
+
+function allocateRoom(requestedRoomId) {
+    if (requestedRoomId) {
+        const sanitized = sanitizeRoomId(requestedRoomId);
+        if (!sanitized) {
+            return { room: getOrCreateAvailableRoom() };
+        }
+        const room = rooms.get(sanitized) || createRoom(sanitized);
+        if (getPlayerCount(room) < MAX_PLAYERS_PER_ROOM) {
+            return { room };
+        }
+        return { error: 'room-full', roomId: sanitized };
+    }
+
+    return { room: getOrCreateAvailableRoom() };
+}
+
+function buildGameState(room) {
+    return {
+        width: room.width,
+        height: room.height,
+        players: room.players,
+        ball: room.ball,
+        score: room.score,
+        teams: room.teams,
+        matchTime: room.matchTime,
+        isPlaying: room.isPlaying,
+        roomId: room.id,
+    };
+}
+
+function resetBall(room) {
+    const thirdWidth = room.width / 3;
+    const minX = room.width / 2 - thirdWidth / 2;
+    const maxX = room.width / 2 + thirdWidth / 2;
+    const thirdHeight = room.height / 3;
+    const minY = room.height / 2 - thirdHeight / 2;
+    const maxY = room.height / 2 + thirdHeight / 2;
+
+    room.ball = {
         x: minX + Math.random() * (maxX - minX),
         y: minY + Math.random() * (maxY - minY),
         radius: BALL_RADIUS,
         speedX: 0,
-        speedY: 0
+        speedY: 0,
     };
-    
-    // Envie uma atualização imediata
-    io.emit('ballReset', { ball: Game.ball });
+
+    room.ballResetInProgress = false;
+
+    io.to(room.id).emit('ballReset', { ball: room.ball });
 }
 
-function checkRestartConditions() {
-    balanceTeams();
-    const hasRedPlayers = Game.teams.red.length > 0;
-    const hasBluePlayers = Game.teams.blue.length > 0;
-    
-    console.log(`Verificando times: Red: ${Game.teams.red.length}, Blue: ${Game.teams.blue.length}`); // Log para debug
-    
+function balanceTeams(room) {
+    const redCount = room.teams.red.length;
+    const blueCount = room.teams.blue.length;
+
+    if (Math.abs(redCount - blueCount) <= 1) {
+        return;
+    }
+
+    const [largerTeam, smallerTeam] = redCount > blueCount ? ['red', 'blue'] : ['blue', 'red'];
+    const playerToMove = room.teams[largerTeam].pop();
+
+    if (!playerToMove) {
+        return;
+    }
+
+    room.teams[smallerTeam].push(playerToMove);
+
+    const player = room.players[playerToMove];
+    if (player) {
+        player.team = smallerTeam;
+        player.x = smallerTeam === 'red' ? 100 : room.width - 100;
+        player.y = room.height / 2;
+
+        const playerSocket = io.sockets.sockets.get(playerToMove);
+        if (playerSocket) {
+            playerSocket.emit('teamChanged', {
+                newTeam: smallerTeam,
+                gameState: buildGameState(room),
+            });
+        }
+    }
+}
+
+function checkRestartConditions(room) {
+    balanceTeams(room);
+
+    const hasRedPlayers = room.teams.red.length > 0;
+    const hasBluePlayers = room.teams.blue.length > 0;
+
     if (hasRedPlayers && hasBluePlayers) {
-        if (Game.teams.red.length > 0 && Game.teams.blue.length > 0) {
-            console.log("Dois jogadores conectados - iniciando partida!");
-            startNewMatch();
+        if (!room.isPlaying && !room.waitingForRestart) {
+            startNewMatch(room);
         }
     } else {
-        console.log("Ainda esperando por dois jogadores...");
-        // Envia atualização para todos os jogadores
-        io.emit('waitingForPlayers', {
-            redCount: Game.teams.red.length,
-            blueCount: Game.teams.blue.length
+        room.isPlaying = false;
+        io.to(room.id).emit('waitingForPlayers', {
+            redCount: room.teams.red.length,
+            blueCount: room.teams.blue.length,
         });
     }
 }
 
-function startNewMatch() {
-    Game.isPlaying = true;
-    Game.waitingForRestart = false;
-    Game.playersReady.clear();
-    Game.score = { red: 0, blue: 0 };
-    Game.matchTime = MATCH_DURATION;
-    resetBall('none');
+function startNewMatch(room) {
+    room.isPlaying = true;
+    room.waitingForRestart = false;
+    room.playersReady.clear();
+    room.score = { red: 0, blue: 0 };
+    room.matchTime = MATCH_DURATION;
+    resetBall(room);
 
-    // Reposiciona todos os jogadores
-    Object.keys(Game.players).forEach(id => {
-        const player = Game.players[id];
-        player.x = player.team === 'red' ? 100 : 700;
-        player.y = 300;
+    Object.keys(room.players).forEach((id) => {
+        const player = room.players[id];
+        player.x = player.team === 'red' ? 100 : room.width - 100;
+        player.y = room.height / 2;
     });
-    
-    // Envia comando para limpar o estado anterior nos clients
-    io.emit('cleanPreviousMatch');
-    
-    // Inicia a nova partida
-    io.emit('matchStart', { 
-        gameState: Game,
-        canMove: true
-    });
-  }
 
-function updateTimer() {
-    if (Game.isPlaying) {
-        Game.matchTime--;
-        
-        if (Game.matchTime <= 0) {
-            Game.isPlaying = false;
-            Game.waitingForRestart = true;
-            const winner = Game.score.red > Game.score.blue ? 'red' : 
-                          Game.score.blue > Game.score.red ? 'blue' : 'draw';
-            
-            // Remove todos os jogadores do campo (mas mantém nos times)
-            Object.keys(Game.players).forEach(id => {
-                Game.players[id].x = -100; // Posição fora da tela
-                Game.players[id].y = -100;
-            });
-            
-            io.emit('matchEnd', { 
-                winner,
-                gameState: Game 
-            });
-        }
-        
-        io.emit('timerUpdate', { matchTime: Game.matchTime });
-    }
+    io.to(room.id).emit('cleanPreviousMatch');
+    io.to(room.id).emit('matchStart', {
+        gameState: buildGameState(room),
+        canMove: true,
+    });
 }
 
-//função para balancear os times
-function balanceTeams() {
-    const redCount = Game.teams.red.length;
-    const blueCount = Game.teams.blue.length;
-    
-    // Se a diferença for maior que 1, balanceie
-    if (Math.abs(redCount - blueCount) > 1) {
-        console.log(`Desbalanceamento detectado: Red ${redCount} vs Blue ${blueCount}. Balanceando...`);
-        
-        // Determina qual time tem mais jogadores
-        const [largerTeam, smallerTeam] = redCount > blueCount ? 
-            ['red', 'blue'] : ['blue', 'red'];
-        
-        // Move o último jogador que entrou para o time menor
-        const playerToMove = Game.teams[largerTeam].pop();
-        if (playerToMove) {
-            Game.teams[smallerTeam].push(playerToMove);
-            
-            // Atualiza o time do jogador
-            if (Game.players[playerToMove]) {
-                Game.players[playerToMove].team = smallerTeam;
-                
-                // Notifica o jogador sobre a mudança
-                const playerSocket = io.sockets.sockets.get(playerToMove);
-                if (playerSocket) {
-                    playerSocket.emit('teamChanged', { 
-                        newTeam: smallerTeam,
-                        gameState: Game
-                    });
-                }
-            }
-        }
+function updateTimer(room) {
+    if (!room.isPlaying) {
+        return;
     }
-    
-    // Se tiver pelo menos 1 em cada time, permite iniciar partida
-    if (Game.teams.red.length > 0 && Game.teams.blue.length > 0) {
-        startNewMatch();
-    } else {
-        io.emit('waitingForPlayers', {
-            redCount: Game.teams.red.length,
-            blueCount: Game.teams.blue.length
+
+    room.matchTime -= 1;
+
+    if (room.matchTime <= 0) {
+        room.isPlaying = false;
+        room.waitingForRestart = true;
+        const winner = room.score.red > room.score.blue ? 'red' : room.score.blue > room.score.red ? 'blue' : 'draw';
+
+        Object.keys(room.players).forEach((id) => {
+            room.players[id].x = -100;
+            room.players[id].y = -100;
+        });
+
+        io.to(room.id).emit('matchEnd', {
+            winner,
+            gameState: buildGameState(room),
         });
     }
+
+    io.to(room.id).emit('timerUpdate', { matchTime: room.matchTime });
 }
 
-// Lógica de conexão
-io.on('connection', (socket) => {
-    console.log('Novo jogador conectado:', socket.id);
+function handleTimers() {
+    rooms.forEach((room) => updateTimer(room));
+}
 
-    // Verifica se já está em um time (reconexão)
-    let team;
-    for (const t of ['red', 'blue']) {
-        if (Game.teams[t].includes(socket.id)) {
-            team = t;
-            break;
-        }
+function runGameLoops() {
+    rooms.forEach((room) => gameLoop(room));
+}
+
+function cleanupRoomIfEmpty(room) {
+    if (room && getPlayerCount(room) === 0) {
+        rooms.delete(room.id);
+        console.log(`Sala removida: ${room.id}`);
+    }
+}
+
+function gameLoop(room) {
+    if (!room.isPlaying) {
+        return;
     }
 
-    // Se não encontrado, atribui novo time
-    if (!team) {
-        const redCount = Game.teams.red.length;
-        const blueCount = Game.teams.blue.length;
-        
-        team = redCount <= blueCount ? 'red' : 'blue';
-        Game.teams[team].push(socket.id);
-        
-        console.log(`Jogador ${socket.id} atribuído ao time ${team}`);
-    }
-
-    // Cria/atualiza jogador
-    Game.players[socket.id] = {
-        x: team === 'red' ? 100 : 700,
-        y: 300,
-        team: team,
-        input: { left: false, right: false, up: false, down: false }
-    };
-
-    // Envia estado inicial
-    socket.emit('init', {
-        team: team,
-        gameState: Game,
-        canMove: Game.teams.red.length > 0 && Game.teams.blue.length > 0
-    });
-
-    // Verifica se pode começar
-    checkRestartConditions();
-
-    // Envia ping regularmente para o cliente
-    setInterval(() => {
-        socket.emit('ping', Date.now());
-    }, 1000); // Envia ping a cada 1 segundo
-
-    socket.on('requestRestart', () => {
-        if (Game.waitingForRestart) {
-            Game.playersReady.add(socket.id);
-            
-            // Mostra o jogador que está pronto (mas ainda bloqueado)
-            if (Game.players[socket.id]) {
-                Game.players[socket.id].x = Game.players[socket.id].team === 'red' ? 100 : 700;
-                Game.players[socket.id].y = 300;
-            }
-            
-            // Verifica se todos os jogadores estão prontos
-            const allPlayers = [...Game.teams.red, ...Game.teams.blue];
-            const allReady = allPlayers.every(id => Game.playersReady.has(id));
-            
-            if (allReady) {
-                // Verifica se temos dois jogadores
-                if (Game.teams.red.length > 0 && Game.teams.blue.length > 0) {
-                    startNewMatch();
-                } else {
-                    io.emit('waitingForOpponent');
-                }
-            }
-            
-            // Atualiza todos os clientes
-            io.emit('playerReadyUpdate', {
-                players: Game.players,
-                readyCount: Game.playersReady.size,
-                totalPlayers: allPlayers.length,
-                canMove: false // Movimento ainda bloqueado
-            });
-        }
-    });
-
-    // Receber inputs do jogador
-    socket.on('input', (input) => {
-        if (Game.players[socket.id] && Game.isPlaying) {
-          Game.players[socket.id].input = input;
-        }
-      });
-
-    // Desconexão
-    socket.on('disconnect', () => {
-        console.log('Jogador desconectado:', socket.id);
-        const team = Game.players[socket.id]?.team;
-        
-        if (team) {
-            // Remove o jogador do time
-            Game.teams[team] = Game.teams[team].filter(id => id !== socket.id);
-            delete Game.players[socket.id];
-            
-            // Verifica se precisa balancear
-            balanceTeams();
-            
-            // Atualiza todos os clientes
-            io.emit('playerDisconnected', {
-                playerId: socket.id,
-                gameState: Game
-            });
-        }
-        
-        Game.waitingPlayers = Game.waitingPlayers.filter(id => id !== socket.id);
-    });
-
-});
-
-// Game loop
-function gameLoop() {
-    if (!Game.isPlaying) return; // Adicione esta verificação
-    // Movimento dos jogadores
-    Object.values(Game.players).forEach(player => {
+    Object.values(room.players).forEach((player) => {
         const speed = 5;
         player.x += (player.input.right ? speed : 0) - (player.input.left ? speed : 0);
         player.y += (player.input.down ? speed : 0) - (player.input.up ? speed : 0);
 
-        player.x = Math.max(PLAYER_RADIUS, Math.min(Game.width - PLAYER_RADIUS, player.x));
-        player.y = Math.max(PLAYER_RADIUS, Math.min(Game.height - PLAYER_RADIUS, player.y));
+        player.x = Math.max(PLAYER_RADIUS, Math.min(room.width - PLAYER_RADIUS, player.x));
+        player.y = Math.max(PLAYER_RADIUS, Math.min(room.height - PLAYER_RADIUS, player.y));
     });
 
-    // Física da bola e colisões
-    let goalScored = false;
-    
-    // Colisão com jogadores
-    Object.values(Game.players).forEach(player => {
-        const dx = Game.ball.x - player.x;
-        const dy = Game.ball.y - player.y;
+    Object.values(room.players).forEach((player) => {
+        const dx = room.ball.x - player.x;
+        const dy = room.ball.y - player.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < PLAYER_RADIUS + BALL_RADIUS) {
             const angle = Math.atan2(dy, dx);
-            const overlap = (PLAYER_RADIUS + BALL_RADIUS) - distance;
-            
-            Game.ball.x += Math.cos(angle) * overlap * 1.1;
-            Game.ball.y += Math.sin(angle) * overlap * 1.1;
+            const overlap = PLAYER_RADIUS + BALL_RADIUS - distance;
+
+            room.ball.x += Math.cos(angle) * overlap * 1.1;
+            room.ball.y += Math.sin(angle) * overlap * 1.1;
 
             const playerVelocity = {
                 x: (player.input.right ? 5 : 0) - (player.input.left ? 5 : 0),
-                y: (player.input.down ? 5 : 0) - (player.input.up ? 5 : 0)
+                y: (player.input.down ? 5 : 0) - (player.input.up ? 5 : 0),
             };
-            
-            Game.ball.speedX = Math.cos(angle) * 12 + playerVelocity.x;
-            Game.ball.speedY = Math.sin(angle) * 12 + playerVelocity.y;
+
+            room.ball.speedX = Math.cos(angle) * 12 + playerVelocity.x;
+            room.ball.speedY = Math.sin(angle) * 12 + playerVelocity.y;
         }
     });
 
-    // Atualização da posição da bola
-    Game.ball.x += Game.ball.speedX;
-    Game.ball.y += Game.ball.speedY;
+    room.ball.x += room.ball.speedX;
+    room.ball.y += room.ball.speedY;
 
-    // Atrito
-    Game.ball.speedX *= 0.89;
-    Game.ball.speedY *= 0.89;
+    room.ball.speedX *= 0.89;
+    room.ball.speedY *= 0.89;
 
-    // Colisão com paredes
-    if (Game.ball.x < BALL_RADIUS || Game.ball.x > Game.width - BALL_RADIUS) {
-        Game.ball.speedX *= -0.7;
-        Game.ball.x = Math.max(BALL_RADIUS, Math.min(Game.width - BALL_RADIUS, Game.ball.x));
-    }
-    if (Game.ball.y < BALL_RADIUS || Game.ball.y > Game.height - BALL_RADIUS) {
-        Game.ball.speedY *= -0.7;
-        Game.ball.y = Math.max(BALL_RADIUS, Math.min(Game.height - BALL_RADIUS, Game.ball.y));
+    if (room.ball.x < BALL_RADIUS || room.ball.x > room.width - BALL_RADIUS) {
+        room.ball.speedX *= -0.7;
+        room.ball.x = Math.max(BALL_RADIUS, Math.min(room.width - BALL_RADIUS, room.ball.x));
     }
 
-   // Verificação de gols
-   const now = Date.now();
-   if (!Game.ballResetInProgress && now - Game.lastGoalTime > Game.goalCooldown) {
-       if (Game.ball.x < GOAL_WIDTH) {
-           if (Game.ball.y > (Game.height/2 - GOAL_HEIGHT/2) && 
-               Game.ball.y < (Game.height/2 + GOAL_HEIGHT/2)) {
-               Game.score.blue++;
-               Game.lastGoalTime = now;
-               Game.ballResetInProgress = true;
-               io.emit('goalScored', { team: 'blue' });
-               setTimeout(() => {
-                   resetBall('right');
-                   Game.ballResetInProgress = false;
-               }, Game.goalCooldown);
-           }
-       } 
-       else if (Game.ball.x > Game.width - GOAL_WIDTH) {
-           if (Game.ball.y > (Game.height/2 - GOAL_HEIGHT/2) && 
-               Game.ball.y < (Game.height/2 + GOAL_HEIGHT/2)) {
-               Game.score.red++;
-               Game.lastGoalTime = now;
-               Game.ballResetInProgress = true;
-               io.emit('goalScored', { team: 'red' });
-               setTimeout(() => {
-                   resetBall('left');
-                   Game.ballResetInProgress = false;
-               }, Game.goalCooldown);
-           }
-       }
+    if (room.ball.y < BALL_RADIUS || room.ball.y > room.height - BALL_RADIUS) {
+        room.ball.speedY *= -0.7;
+        room.ball.y = Math.max(BALL_RADIUS, Math.min(room.height - BALL_RADIUS, room.ball.y));
     }
 
-    // Reset da bola se sair do campo
-    if (!goalScored && (Game.ball.x < 0 || Game.ball.x > Game.width)) {
-        resetBall(Game.ball.x < 0 ? 'right' : 'left');
+    const now = Date.now();
+    if (!room.ballResetInProgress && now - room.lastGoalTime > room.goalCooldown) {
+        if (room.ball.x < GOAL_WIDTH) {
+            if (room.ball.y > room.height / 2 - GOAL_HEIGHT / 2 && room.ball.y < room.height / 2 + GOAL_HEIGHT / 2) {
+                room.score.blue += 1;
+                room.lastGoalTime = now;
+                room.ballResetInProgress = true;
+                io.to(room.id).emit('goalScored', { team: 'blue' });
+                setTimeout(() => {
+                    resetBall(room);
+                }, room.goalCooldown);
+            }
+        } else if (room.ball.x > room.width - GOAL_WIDTH) {
+            if (room.ball.y > room.height / 2 - GOAL_HEIGHT / 2 && room.ball.y < room.height / 2 + GOAL_HEIGHT / 2) {
+                room.score.red += 1;
+                room.lastGoalTime = now;
+                room.ballResetInProgress = true;
+                io.to(room.id).emit('goalScored', { team: 'red' });
+                setTimeout(() => {
+                    resetBall(room);
+                }, room.goalCooldown);
+            }
+        }
     }
 
-    io.emit('update', {
-        players: Game.players,
-        ball: Game.ball,
-        score: Game.score,
-        matchTime: Game.matchTime,
-        isPlaying: Game.isPlaying,
-        teams: Game.teams
+    if (!room.ballResetInProgress && (room.ball.x < 0 || room.ball.x > room.width)) {
+        resetBall(room);
+    }
+
+    io.to(room.id).emit('update', {
+        players: room.players,
+        ball: room.ball,
+        score: room.score,
+        matchTime: room.matchTime,
+        isPlaying: room.isPlaying,
+        teams: room.teams,
+        roomId: room.id,
     });
 }
 
-// Iniciar intervalos
-let gameInterval = setInterval(gameLoop, 1000 / 60);
-let timerInterval = setInterval(updateTimer, 1000);
+io.on('connection', (socket) => {
+    const requestedRoomId = socket.handshake.query?.roomId;
+    const allocation = allocateRoom(requestedRoomId);
+
+    if (allocation.error === 'room-full') {
+        socket.emit('roomFull', {
+            roomId: allocation.roomId,
+            capacity: MAX_PLAYERS_PER_ROOM,
+        });
+        socket.disconnect(true);
+        return;
+    }
+
+    const room = allocation.room;
+    socket.join(room.id);
+    socket.data.roomId = room.id;
+
+    const redCount = room.teams.red.length;
+    const blueCount = room.teams.blue.length;
+    const team = redCount <= blueCount ? 'red' : 'blue';
+    room.teams[team].push(socket.id);
+
+    room.players[socket.id] = {
+        x: team === 'red' ? 100 : room.width - 100,
+        y: room.height / 2,
+        team,
+        input: { left: false, right: false, up: false, down: false },
+    };
+
+    socket.emit('roomAssigned', {
+        roomId: room.id,
+        capacity: MAX_PLAYERS_PER_ROOM,
+        players: getPlayerCount(room),
+    });
+
+    socket.emit('init', {
+        team,
+        gameState: buildGameState(room),
+        canMove: room.isPlaying && room.teams.red.length > 0 && room.teams.blue.length > 0,
+        roomId: room.id,
+    });
+
+    checkRestartConditions(room);
+
+    const pingInterval = setInterval(() => {
+        socket.emit('ping', Date.now());
+    }, 1000);
+
+    socket.on('requestRestart', () => {
+        if (!room.waitingForRestart) {
+            return;
+        }
+
+        room.playersReady.add(socket.id);
+
+        if (room.players[socket.id]) {
+            room.players[socket.id].x = room.players[socket.id].team === 'red' ? 100 : room.width - 100;
+            room.players[socket.id].y = room.height / 2;
+        }
+
+        const allPlayers = [...room.teams.red, ...room.teams.blue];
+        const allReady = allPlayers.length > 0 && allPlayers.every((id) => room.playersReady.has(id));
+
+        if (allReady) {
+            if (room.teams.red.length > 0 && room.teams.blue.length > 0) {
+                startNewMatch(room);
+            } else {
+                io.to(room.id).emit('waitingForOpponent');
+            }
+        }
+
+        io.to(room.id).emit('playerReadyUpdate', {
+            players: room.players,
+            readyCount: room.playersReady.size,
+            totalPlayers: allPlayers.length,
+            canMove: false,
+        });
+    });
+
+    socket.on('input', (input) => {
+        if (room.players[socket.id] && room.isPlaying) {
+            room.players[socket.id].input = input;
+        }
+    });
+
+    socket.on('disconnect', () => {
+        clearInterval(pingInterval);
+        console.log('Jogador desconectado:', socket.id);
+
+        const player = room.players[socket.id];
+        if (player) {
+            room.teams[player.team] = room.teams[player.team].filter((id) => id !== socket.id);
+            delete room.players[socket.id];
+
+            room.playersReady.delete(socket.id);
+
+            io.to(room.id).emit('playerDisconnected', {
+                playerId: socket.id,
+                gameState: buildGameState(room),
+            });
+
+            checkRestartConditions(room);
+        }
+
+        cleanupRoomIfEmpty(room);
+    });
+});
+
+setInterval(runGameLoops, 1000 / 60);
+setInterval(handleTimers, 1000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
