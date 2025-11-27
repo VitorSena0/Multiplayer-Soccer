@@ -4,6 +4,9 @@ const config = {
       width: 800,
       height: 600
     },
+    field: {
+      cornerSize: 80
+    },
     player: {
       radius: 20
     },
@@ -483,9 +486,109 @@ const config = {
       // Limpar canvas
       ctx.clearRect(0, 0, config.canvas.width, config.canvas.height);
       
-      // Fundo
-      ctx.fillStyle = '#2c3e50';
+      // Fundo base
+      ctx.fillStyle = '#28412f';
       ctx.fillRect(0, 0, config.canvas.width, config.canvas.height);
+
+      // Textura de gramado pixelado (listras)
+      const stripeHeight = 24;
+      for (let y = 0; y < config.canvas.height; y += stripeHeight) {
+        ctx.fillStyle = (Math.floor(y / stripeHeight) % 2 === 0) ? '#2f4b37' : '#25382b';
+        ctx.fillRect(0, y, config.canvas.width, stripeHeight);
+      }
+
+      // Cantos triangulares
+      const cornerSize = config.field.cornerSize || 0;
+      if (cornerSize > 0) {
+        ctx.fillStyle = '#1f2f35';
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(cornerSize, 0);
+        ctx.lineTo(0, cornerSize);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(config.canvas.width - cornerSize, 0);
+        ctx.lineTo(config.canvas.width, 0);
+        ctx.lineTo(config.canvas.width, cornerSize);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(0, config.canvas.height - cornerSize);
+        ctx.lineTo(0, config.canvas.height);
+        ctx.lineTo(cornerSize, config.canvas.height);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(config.canvas.width - cornerSize, config.canvas.height);
+        ctx.lineTo(config.canvas.width, config.canvas.height);
+        ctx.lineTo(config.canvas.width, config.canvas.height - cornerSize);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Linhas do campo
+      ctx.strokeStyle = '#f5f5f5';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([]);
+      const padding = 0;
+      const innerWidth = config.canvas.width - padding * 2;
+      const innerHeight = config.canvas.height - padding * 2;
+
+      ctx.strokeRect(padding, padding, innerWidth, innerHeight);
+
+      // Linha central
+      ctx.beginPath();
+      ctx.moveTo(config.canvas.width / 2, padding);
+      ctx.lineTo(config.canvas.width / 2, config.canvas.height - padding);
+      ctx.stroke();
+
+      // Círculo central
+      ctx.beginPath();
+      ctx.arc(config.canvas.width / 2, config.canvas.height / 2, 60, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(config.canvas.width / 2, config.canvas.height / 2, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#f5f5f5';
+      ctx.fill();
+
+      // Áreas e gols
+      const bigBoxWidth = 140;
+      const bigBoxHeight = 260;
+      const smallBoxWidth = 70;
+      const smallBoxHeight = 140;
+      const goalLineTop = (config.canvas.height - bigBoxHeight) / 2;
+      const goalLineBottom = goalLineTop + bigBoxHeight;
+
+      // Área grande esquerda
+      ctx.strokeRect(padding, goalLineTop, bigBoxWidth, bigBoxHeight);
+      // Área pequena esquerda
+      ctx.strokeRect(padding, (config.canvas.height - smallBoxHeight) / 2, smallBoxWidth, smallBoxHeight);
+      // Pênalti esquerdo
+      ctx.beginPath();
+      ctx.arc(padding + 90, config.canvas.height / 2, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Área grande direita
+      ctx.strokeRect(config.canvas.width - padding - bigBoxWidth, goalLineTop, bigBoxWidth, bigBoxHeight);
+      // Área pequena direita
+      ctx.strokeRect(config.canvas.width - padding - smallBoxWidth, (config.canvas.height - smallBoxHeight) / 2, smallBoxWidth, smallBoxHeight);
+      // Pênalti direito
+      ctx.beginPath();
+      ctx.arc(config.canvas.width - padding - 90, config.canvas.height / 2, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Semicírculos das áreas
+      ctx.beginPath();
+      ctx.arc(padding + bigBoxWidth, config.canvas.height / 2, 60, Math.PI * 1.5, Math.PI / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(config.canvas.width - padding - bigBoxWidth, config.canvas.height / 2, 60, Math.PI / 2, Math.PI * 1.5);
+      ctx.stroke();
   
       // Gols
       ctx.fillStyle = '#ff000055';
