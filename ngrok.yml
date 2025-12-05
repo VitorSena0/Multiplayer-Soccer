@@ -1,5 +1,0 @@
-tunnels:
-  soccer-game:
-    addr: 3000
-    proto: http
-    bind_tls: true

@@ -1,0 +1,14 @@
+services:
+  app:
+    image: multiplayer-soccer-app:latest
+    container_name: multiplayer-soccer-app
+    expose:
+      - "3000"
+
+  nginx:
+    image: multiplayer-soccer-nginx:latest
+    container_name: multiplayer-soccer-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - app
