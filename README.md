@@ -260,8 +260,6 @@ Multiplayer-Soccer/
 ├─ package.json           # Metadados e scripts npm
 ├─ dockerfile             # Dockerfile do app Node
 ├─ docker-compose.yml     # Compose para subir app + nginx
-├─ DOCKER.md              # Guia detalhado de Dockerização
-├─ guia_deploy_AWS_Docker_Nginx.md  # Guia de deploy na AWS com/sem Docker
 ├─ README.md              # Este arquivo
 │
 ├─ game/                  # Lado servidor: lógica de jogo
@@ -280,8 +278,6 @@ Multiplayer-Soccer/
 ├─ nginx/                 # Configuração Nginx para proxy reverso
 │  ├─ default.conf
 │  └─ Dockerfile
-│
-└─ Mapa Mental – Projeto Multiplayer Socc.md   # Documentação/diagrama conceitual
 ```
 
 ---
@@ -321,8 +317,6 @@ Acesse em:
 
 - `http://localhost:3000`
 
-Mais detalhes em `DOCKER.md`.
-
 ### 2. Docker Compose (app + Nginx)
 
 O arquivo `docker-compose.yml` define dois serviços:
@@ -361,8 +355,6 @@ Fluxo típico:
 ---
 
 ## Deploy em Produção (AWS EC2 + Nginx)
-
-O repositório inclui um guia completo em `guia_deploy_AWS_Docker_Nginx.md`, com dois cenários:
 
 1. **Sem Docker**:
 	 - Node.js + npm instalados direto na EC2.
