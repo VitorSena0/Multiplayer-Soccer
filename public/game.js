@@ -27,7 +27,8 @@ const config = {
     waitingScreen: document.createElement('div'),
     winnerDisplay: document.createElement('div'),
       restartButton: document.createElement('button'),
-      roomInfo: document.createElement('div')
+      roomInfo: document.createElement('div'),
+    ping: document.createElement('div')
   };
   
   // Estado do jogo
@@ -39,6 +40,7 @@ const config = {
       roomCapacity: 0,
       roomPlayerCount: 0,
       requestedRoomId: null,
+      ping: null, // Latência em ms
     inputs: { left: false, right: false, up: false, down: false, action: false },
     gameState: {
       players: {},
@@ -77,12 +79,27 @@ const config = {
            (navigator.maxTouchPoints > 0) || 
            (navigator.msMaxTouchPoints > 0);
   }
+
+  // Atualiza o display de ping
+  function atualizarDisplayPing() {
+    if (!elements.ping) return;
+    if (state.ping === null) {
+      elements.ping.textContent = 'Ping: -- ms';
+    } else {
+      elements.ping.textContent = `Ping: ${state.ping} ms`;
+    }
+  } 
   
 
   const ctx = initCanvas();
   
   // Inicialização da UI
   function initUI() {
+
+    elements.ping.id = 'ping';
+    elements.ping.textContent = 'Ping: -- ms';
+    document.body.appendChild(elements.ping);
+
     elements.ui.id = 'game-ui';
     document.body.appendChild(elements.ui);
     
@@ -105,9 +122,11 @@ const config = {
     elements.restartButton.textContent = 'Jogar Novamente';
     elements.restartButton.style.display = 'none';
     elements.ui.appendChild(elements.restartButton);
+
   }
   
   initUI();
+  atualizarDisplayPing();
 
   state.requestedRoomId = getRequestedRoomId();
   state.roomId = state.requestedRoomId;
@@ -300,6 +319,15 @@ const config = {
   // Registrar handlers
   Object.entries(socketHandlers).forEach(([event, handler]) => {
     socket.on(event, handler);
+  });
+
+
+  socket.on('ping', (serverTimestamp) => { // A função anônima recebe o timestamp do servidor
+    const now = Date.now();
+    const latencia = now - serverTimestamp;
+    state.ping = latencia;
+
+    atualizarDisplayPing();
   });
   
   // Funções de UI

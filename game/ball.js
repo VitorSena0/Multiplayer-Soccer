@@ -16,7 +16,7 @@ function resetBall(room, io) {
         speedY: 0,
     };
 
-    room.ballResetInProgress = false;
+    room.ballResetInProgress = false; // Reseta o flag de reinício da bola, serve para evitar múltiplos gols durante o cooldown
 
     io.to(room.id).emit('ballReset', { ball: room.ball });
 }

@@ -32,7 +32,7 @@ function registerSocketHandlers(io) {
             input: { left: false, right: false, up: false, down: false },
         };
 
-        socket.emit('roomAssigned', {
+        socket.emit('roomAssigned', { // Indica que o jogador foi atribuído a uma sala
             roomId: room.id,
             capacity: MAX_PLAYERS_PER_ROOM,
             players: Object.keys(room.players).length,
@@ -47,6 +47,7 @@ function registerSocketHandlers(io) {
 
         checkRestartConditions(room, io);
 
+        // Envia pings regulares para medir a latência
         const pingInterval = setInterval(() => {
             socket.emit('ping', Date.now());
         }, 1000);

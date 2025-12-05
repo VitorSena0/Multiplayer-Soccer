@@ -63,28 +63,28 @@ function gameLoop(room, io) {
     enforceCornerBoundaries(room);
 
     // Gols
-    const now = Date.now();
-    if (!room.ballResetInProgress && now - room.lastGoalTime > room.goalCooldown) {
-        if (room.ball.x < GOAL_WIDTH) {
+    const now = Date.now(); // A cada iteração do loop pega o timestamp atual
+    if (!room.ballResetInProgress && now - room.lastGoalTime > room.goalCooldown) { // Evita gols múltiplos durante o cooldown
+        if (room.ball.x < GOAL_WIDTH) { // Gol do time azul
             if (
                 room.ball.y > room.height / 2 - GOAL_HEIGHT / 2 &&
                 room.ball.y < room.height / 2 + GOAL_HEIGHT / 2
-            ) {
+            ) { // Verifica se a bola está dentro da área do gol
                 room.score.blue += 1;
-                room.lastGoalTime = now;
+                room.lastGoalTime = now; // Atualiza o tempo do último gol para evitar múltiplos gols durante o cooldown
                 room.ballResetInProgress = true;
                 io.to(room.id).emit('goalScored', { team: 'blue' });
                 setTimeout(() => {
                     resetBall(room, io);
                 }, room.goalCooldown);
             }
-        } else if (room.ball.x > room.width - GOAL_WIDTH) {
+        } else if (room.ball.x > room.width - GOAL_WIDTH) { // Gol do time vermelho
             if (
                 room.ball.y > room.height / 2 - GOAL_HEIGHT / 2 &&
                 room.ball.y < room.height / 2 + GOAL_HEIGHT / 2
-            ) {
+            ) { // Verifica se a bola está dentro da área do gol
                 room.score.red += 1;
-                room.lastGoalTime = now;
+                room.lastGoalTime = now; // Atualiza o tempo do último gol para evitar múltiplos gols durante o cooldown
                 room.ballResetInProgress = true;
                 io.to(room.id).emit('goalScored', { team: 'red' });
                 setTimeout(() => {
@@ -99,7 +99,7 @@ function gameLoop(room, io) {
         resetBall(room, io);
     }
 
-    // Atualiza clientes
+    // Atualiza clientes, enviando o estado do jogo
     io.to(room.id).emit('update', {
         players: room.players,
         ball: room.ball,
