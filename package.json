@@ -8,7 +8,8 @@
   "main": "game-server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node game-server.js"
+    "start": "node game-server.js",
+    "start:webrtc": "ENABLE_WEBRTC=true node game-server.js"
   },
   "keywords": [],
   "author": "",

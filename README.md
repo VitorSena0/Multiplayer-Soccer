@@ -384,15 +384,99 @@ Variáveis utilizadas:
 	- Porta na qual o servidor Node/Express/Socket.IO irá escutar.
 	- Padrão: `3000` se não definido.
 
+- `ENABLE_WEBRTC`:
+	- Habilita o suporte a WebRTC DataChannels para comunicação de baixa latência.
+	- Padrão: `false` (desabilitado, usa apenas Socket.IO).
+	- Valores aceitos: `true` ou `false`.
+	- Quando habilitado:
+		- O servidor inicia um loop adicional de atualização a 30 FPS para clientes WebRTC.
+		- Clientes tentam estabelecer DataChannels para envio de inputs e recebimento de estado.
+		- Socket.IO é mantido para controle de salas, matchmaking e fallback.
+
 Exemplos:
 
 ```bash
 # Rodar em outra porta localmente
 PORT=4000 node game-server.js
 
+# Habilitar WebRTC DataChannels
+ENABLE_WEBRTC=true node game-server.js
+
+# Combinar variáveis
+PORT=4000 ENABLE_WEBRTC=true node game-server.js
+
 # Com Docker
-docker run --rm -e PORT=3000 -p 3000:3000 multiplayer-soccer-app
+docker run --rm -e PORT=3000 -e ENABLE_WEBRTC=true -p 3000:3000 multiplayer-soccer-app
 ```
+
+---
+
+## WebRTC DataChannels
+
+O projeto agora suporta **WebRTC DataChannels** como caminho de comunicação de baixa latência para dados de jogo em tempo real.
+
+### Como funciona
+
+1. **Sinalização via Socket.IO**: O servidor e o cliente trocam mensagens de sinalização (offer, answer, ICE candidates) através de Socket.IO.
+
+2. **Estabelecimento de DataChannel**: O cliente estabelece uma conexão WebRTC peer-to-peer com o servidor, criando um DataChannel não ordenado e sem retransmissão para máxima velocidade.
+
+3. **Comunicação híbrida**:
+   - **Socket.IO**: Usado para controle de salas, matchmaking, eventos de partida, e como fallback.
+   - **WebRTC DataChannel**: Usado para envio de inputs de movimento do jogador e recebimento de atualizações de estado do jogo.
+
+4. **Tick rate otimizado**: Enquanto o game loop principal roda a 60 FPS, as atualizações via WebRTC são enviadas a 30 FPS, reduzindo a carga de rede sem impactar significativamente a experiência.
+
+5. **Fallback automático**: Se o WebRTC falhar ou não estiver disponível, o cliente automaticamente volta a usar Socket.IO para toda a comunicação.
+
+### Habilitando WebRTC
+
+Para habilitar o WebRTC DataChannels:
+
+```bash
+# Localmente
+ENABLE_WEBRTC=true npm start
+
+# Ou diretamente
+ENABLE_WEBRTC=true node game-server.js
+
+# Com Docker
+docker run -e ENABLE_WEBRTC=true -p 3000:3000 multiplayer-soccer-app
+```
+
+### Desabilitando WebRTC (padrão)
+
+Por padrão, o WebRTC está **desabilitado** para manter compatibilidade total com clientes existentes:
+
+```bash
+# Explicitamente desabilitar
+ENABLE_WEBRTC=false npm start
+
+# Ou simplesmente omitir a variável (comportamento padrão)
+npm start
+```
+
+### Benefícios do WebRTC
+
+- **Menor latência**: DataChannels fornecem comunicação peer-to-peer com latência reduzida.
+- **Melhor desempenho**: Menos overhead de protocolo comparado a WebSockets para dados de alta frequência.
+- **Escalabilidade**: Reduz a carga no servidor usando comunicação P2P quando possível.
+- **Sem quebras**: Clientes antigos continuam funcionando normalmente via Socket.IO.
+
+### Requisitos técnicos
+
+- Navegadores modernos com suporte a WebRTC (Chrome, Firefox, Safari, Edge).
+- Conexão de rede que permita tráfego UDP (necessário para WebRTC).
+- Servidores STUN configurados (já inclusos: `stun.l.google.com`).
+
+### Teste de funcionamento
+
+1. Inicie o servidor com WebRTC habilitado.
+2. Abra o console do navegador (F12).
+3. Procure por mensagens como:
+   - "WebRTC DataChannels enabled by server"
+   - "WebRTC DataChannel opened"
+   - "WebRTC connection state: connected"
 
 ---
 
