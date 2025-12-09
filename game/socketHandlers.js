@@ -1,6 +1,8 @@
 const { MAX_PLAYERS_PER_ROOM } = require('./constants');
 const { allocateRoom, buildGameState, cleanupRoomIfEmpty } = require('./roomManager');
 const { checkRestartConditions, startNewMatch } = require('./match');
+const { initializeWebRTCSignaling } = require('./webrtcSignaling');
+const { ENABLE_WEBRTC } = require('./webrtc-config');
 
 function registerSocketHandlers(io) {
     io.on('connection', (socket) => {
@@ -43,9 +45,13 @@ function registerSocketHandlers(io) {
             gameState: buildGameState(room),
             canMove: room.isPlaying && room.teams.red.length > 0 && room.teams.blue.length > 0,
             roomId: room.id,
+            webrtcEnabled: ENABLE_WEBRTC,
         });
 
         checkRestartConditions(room, io);
+
+        // Initialize WebRTC signaling if enabled
+        initializeWebRTCSignaling(io, socket, room);
 
         // Envia pings regulares para medir a latência
         const pingInterval = setInterval(() => {

@@ -157,6 +157,27 @@ const config = {
   const socket = io(window.location.origin, {
     query: { roomId: state.requestedRoomId || '' }
   });
+
+  // Initialize WebRTC handler
+  let webrtcHandler = null;
+  try {
+    webrtcHandler = new WebRTCHandler(socket);
+    
+    // Set up WebRTC state update callback
+    webrtcHandler.onStateReceive = (update) => {
+      // Update game state from WebRTC DataChannel
+      state.gameState = { ...state.gameState, ...update };
+      state.roomId = update.roomId || state.roomId;
+      state.roomPlayerCount = Object.keys(state.gameState.players).length;
+      state.canMove = state.gameState.isPlaying && 
+        ((state.currentTeam === 'red' && state.gameState.teams.blue.length > 0) || 
+         (state.currentTeam === 'blue' && state.gameState.teams.red.length > 0));
+      updateRoomInfoDisplay();
+      updateUI();
+    };
+  } catch (error) {
+    console.warn('WebRTC not available, using Socket.IO only:', error);
+  }
   
   // Handlers de socket
   const socketHandlers = {
@@ -707,7 +728,12 @@ const config = {
   // Loop de input
   setInterval(() => {
     if (state.currentTeam !== 'spectator' && state.canMove) {
-      socket.emit('input', state.inputs);
+      // Try to send through WebRTC DataChannel first, fallback to Socket.IO
+      if (webrtcHandler && !webrtcHandler.sendInput(state.inputs)) {
+        socket.emit('input', state.inputs);
+      } else if (!webrtcHandler) {
+        socket.emit('input', state.inputs);
+      }
     }
   }, 1000 / 60);
   

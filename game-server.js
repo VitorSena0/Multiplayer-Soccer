@@ -6,6 +6,8 @@ const { rooms } = require('./game/roomManager');
 const { gameLoop } = require('./game/gameLoop');
 const { updateTimer } = require('./game/match');
 const { registerSocketHandlers } = require('./game/socketHandlers');
+const { startWebRTCGameLoop } = require('./game/webrtcGameLoop');
+const { ENABLE_WEBRTC } = require('./game/webrtc-config');
 
 const app = express(); // Cria uma aplicação Express, na qual a variável app recebe todas as funcionalidades do Express 
 const server = http.createServer(app); // Cria um servidor HTTP usando a aplicação Express
@@ -36,8 +38,17 @@ function handleTimers() {
 setInterval(runGameLoops, 1000 / 60); // Executa o loop de jogo a 60 FPS
 setInterval(handleTimers, 1000); // Atualiza os temporizadores a cada segundo
 
+// Inicia o WebRTC game loop se habilitado
+const webrtcLoopInterval = startWebRTCGameLoop(rooms, io);
+
 // Inicia o servidor na porta especificada ou na porta 3000 por padrão
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => { // server.listen inicia o servidor para escutar conexões na porta especificada e 0.0.0.0 indica que aceita conexões de qualquer endereço IP
     console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`WebRTC DataChannels: ${ENABLE_WEBRTC ? 'HABILITADO' : 'DESABILITADO'}`);
+    if (ENABLE_WEBRTC) {
+        console.log('Para desabilitar WebRTC, defina ENABLE_WEBRTC=false');
+    } else {
+        console.log('Para habilitar WebRTC, defina ENABLE_WEBRTC=true');
+    }
 });
