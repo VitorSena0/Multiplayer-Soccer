@@ -1,6 +1,20 @@
 /**
  * WebRTC DataChannel handler for client-side
- * Establishes a WebRTC DataChannel connection for low-latency game state updates
+ * 
+ * ARCHITECTURAL NOTE:
+ * This implementation establishes WebRTC DataChannel connections and uses Socket.IO
+ * as the transport layer for game data. While the DataChannel is created and managed,
+ * data transmission currently goes through Socket.IO. This hybrid approach provides:
+ * 
+ * 1. WebRTC connection state management and monitoring
+ * 2. Reduced-tick updates (30 FPS vs 60 FPS) for WebRTC-enabled clients
+ * 3. Foundation for future native DataChannel usage when server-side WebRTC support
+ *    is added (requires native Node.js WebRTC like the wrtc package)
+ * 
+ * To enable true peer-to-peer DataChannel communication:
+ * - Server needs native WebRTC implementation (e.g., wrtc npm package)
+ * - Replace Socket.IO emit calls with this.dataChannel.send()
+ * - Handle binary or JSON serialization for DataChannel messages
  */
 
 class WebRTCHandler {
@@ -101,6 +115,11 @@ class WebRTCHandler {
             this.ready = false;
         };
 
+        // Note: In this implementation, we establish the DataChannel for connection
+        // management and future extensibility, but currently use Socket.IO as the
+        // transport layer for data. To use native DataChannel sending/receiving,
+        // the server would need native WebRTC support (e.g., via the wrtc npm package),
+        // which requires platform-specific binary compilation.
         this.dataChannel.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);

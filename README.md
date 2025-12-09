@@ -459,9 +459,20 @@ npm start
 ### Benefícios do WebRTC
 
 - **Menor latência**: DataChannels fornecem comunicação peer-to-peer com latência reduzida.
-- **Melhor desempenho**: Menos overhead de protocolo comparado a WebSockets para dados de alta frequência.
-- **Escalabilidade**: Reduz a carga no servidor usando comunicação P2P quando possível.
+- **Tick rate otimizado**: Atualiza a 30 FPS para clientes WebRTC (vs 60 FPS Socket.IO), reduzindo carga de rede.
+- **Gerenciamento de estado**: WebRTC connection monitoring para melhor controle de qualidade.
 - **Sem quebras**: Clientes antigos continuam funcionando normalmente via Socket.IO.
+
+### Implementação atual
+
+A implementação atual é **híbrida**:
+- Estabelece conexões WebRTC DataChannel para gerenciamento de estado
+- Usa Socket.IO como transporte para dados de jogo
+- Fornece tick rate reduzido (30 FPS) para clientes WebRTC-ready
+- Mantém fallback completo para Socket.IO
+
+**Para habilitar DataChannel nativo no futuro:**
+O servidor precisaria de suporte nativo a WebRTC (pacote `wrtc` do npm), que requer compilação de binários específicos da plataforma. A infraestrutura já está preparada para essa evolução.
 
 ### Requisitos técnicos
 
