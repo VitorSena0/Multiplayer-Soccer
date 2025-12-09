@@ -1,7 +1,7 @@
 const { MAX_PLAYERS_PER_ROOM } = require('./constants');
 const { allocateRoom, buildGameState, cleanupRoomIfEmpty } = require('./roomManager');
 const { checkRestartConditions, startNewMatch } = require('./match');
-const { initializeWebRTCSignaling } = require('./webrtcSignaling');
+const { initializeWebRTCSignaling, webrtcConnections } = require('./webrtcSignaling');
 const { ENABLE_WEBRTC } = require('./webrtc-config');
 
 function registerSocketHandlers(io) {
@@ -100,6 +100,11 @@ function registerSocketHandlers(io) {
         socket.on('disconnect', () => {
             clearInterval(pingInterval);
             console.log('Jogador desconectado:', socket.id);
+
+            // Clean up WebRTC connection if exists
+            if (ENABLE_WEBRTC) {
+                webrtcConnections.delete(socket.id);
+            }
 
             const player = room.players[socket.id];
             if (player) {

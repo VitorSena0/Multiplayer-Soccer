@@ -76,12 +76,6 @@ function initializeWebRTCSignaling(io, socket, room) {
             room.players[socket.id].input = input;
         }
     });
-
-    // Cleanup on disconnect
-    const originalDisconnect = socket.listeners('disconnect')[0];
-    socket.on('disconnect', () => {
-        webrtcConnections.delete(socket.id);
-    });
 }
 
 /**

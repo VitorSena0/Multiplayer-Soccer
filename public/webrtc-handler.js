@@ -65,8 +65,7 @@ class WebRTCHandler {
                 
                 if (this.peerConnection.connectionState === 'failed') {
                     console.warn('WebRTC connection failed, falling back to Socket.IO');
-                    this.enabled = false;
-                    this.ready = false;
+                    this.close();
                 }
             };
 
@@ -81,7 +80,7 @@ class WebRTCHandler {
 
         } catch (error) {
             console.error('Error initializing WebRTC:', error);
-            this.enabled = false;
+            this.close();
         }
     }
 
@@ -124,16 +123,16 @@ class WebRTCHandler {
             });
         } catch (error) {
             console.error('Error creating WebRTC offer:', error);
-            this.enabled = false;
+            this.close();
         }
     }
 
     sendInput(input) {
         if (this.ready && this.dataChannel && this.dataChannel.readyState === 'open') {
             try {
-                // Send through DataChannel for lower latency
-                // Note: In this implementation, we're still using Socket.IO as a proxy
-                // because true server-side DataChannel requires native Node.js support
+                // Send through Socket.IO as transport for WebRTC-enabled clients
+                // This architecture uses Socket.IO as the transport layer for both
+                // signaling and data, while maintaining the WebRTC connection state
                 this.socket.emit('webrtc:input', input);
                 return true;
             } catch (error) {
@@ -151,11 +150,14 @@ class WebRTCHandler {
     close() {
         if (this.dataChannel) {
             this.dataChannel.close();
+            this.dataChannel = null;
         }
         if (this.peerConnection) {
             this.peerConnection.close();
+            this.peerConnection = null;
         }
         this.ready = false;
+        this.enabled = false;
     }
 }
 

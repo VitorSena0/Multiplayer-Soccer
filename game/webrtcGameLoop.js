@@ -29,7 +29,6 @@ function webrtcGameLoop(room, io) {
         score: room.score,
         matchTime: room.matchTime,
         isPlaying: room.isPlaying,
-        via: 'webrtc', // Flag to indicate this came through the WebRTC path
     };
 
     // Send to WebRTC-ready clients through Socket.IO

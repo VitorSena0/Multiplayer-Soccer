@@ -729,9 +729,8 @@ const config = {
   setInterval(() => {
     if (state.currentTeam !== 'spectator' && state.canMove) {
       // Try to send through WebRTC DataChannel first, fallback to Socket.IO
-      if (webrtcHandler && !webrtcHandler.sendInput(state.inputs)) {
-        socket.emit('input', state.inputs);
-      } else if (!webrtcHandler) {
+      const sentViaWebRTC = webrtcHandler && webrtcHandler.sendInput(state.inputs);
+      if (!sentViaWebRTC) {
         socket.emit('input', state.inputs);
       }
     }
