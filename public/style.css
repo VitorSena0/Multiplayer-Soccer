@@ -175,22 +175,7 @@ body {
     transition: transform 0.1s ease;
   }
   
-  #action-btn {
-    width: 80px;
-    height: 80px;
-    background: rgba(255, 0, 0, 0.3);
-    border-radius: 50%;
-    border: none;
-    color: white;
-    font-size: 16px;
-    margin-right: 20px;
-    touch-action: none;
-    transition: background-color 0.2s;
-  }
-  
-  #action-btn:active {
-    background: rgba(255, 0, 0, 0.6);
-  }
+
   
   /* Ajustes para dispositivos móveis */
   @media (max-width: 768px) {
