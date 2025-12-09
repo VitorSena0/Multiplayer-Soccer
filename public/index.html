@@ -21,6 +21,8 @@
     <script>
       if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
         document.getElementById('mobile-controls').style.display = 'flex';
+        const actionBtn = document.getElementById('action-btn');
+        if (actionBtn) actionBtn.style.display = 'none';
       }
     </script>
   </body>
