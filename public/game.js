@@ -53,6 +53,7 @@ const config = {
       height: config.canvas.height
     }
   };
+  let controlsInitialized = false;
 
     function getRequestedRoomId() {
       const params = new URLSearchParams(window.location.search);
@@ -359,9 +360,11 @@ const config = {
         }
         
         const canvasRect = elements.canvas.getBoundingClientRect();
+        const scaleX = canvasRect.width / elements.canvas.width;
+        const scaleY = canvasRect.height / elements.canvas.height;
         idElement.style.position = 'absolute';
-        idElement.style.left = `${canvasRect.left + player.x }px`;
-        idElement.style.top = `${canvasRect.top + player.y - config.player.radius + 10}px`;
+        idElement.style.left = `${canvasRect.left + (player.x * scaleX)}px`;
+        idElement.style.top = `${canvasRect.top + (player.y * scaleY) - (config.player.radius * scaleY) + 10}px`;
         idElement.style.zIndex = '10';
         document.body.appendChild(idElement);
       }
@@ -390,27 +393,31 @@ const config = {
   // Controles
   function setupControls() {
     const mobileControls = document.getElementById('mobile-controls');
-    if (!mobileControls || mobileControls.style.display === 'none') return;
+    if (!mobileControls) return;
+    const controlsVisible = window.getComputedStyle(mobileControls).display !== 'none';
+    if (!controlsVisible) return;
+    if (controlsInitialized) return;
   
     const joystickThumb = document.getElementById('joystick-thumb');
     const joystickBase = document.getElementById('joystick-base');
     const actionBtn = document.getElementById('action-btn');
-    
+  
     if (!joystickThumb || !joystickBase || !actionBtn) {
       console.warn('Elementos de controle móvel não encontrados');
       return;
     }
     
     let activeTouchId = null;
-    const joystickRadius = 50;
-    const baseRect = joystickBase.getBoundingClientRect();
-    const centerPosition = { 
-      x: baseRect.left + baseRect.width / 2, 
-      y: baseRect.top + baseRect.height / 2 
-    };
   
     // Função para atualizar posição do joystick
     const updateJoystickPosition = (touch) => {
+      const baseRect = joystickBase.getBoundingClientRect();
+      const joystickRadius = Math.min(baseRect.width, baseRect.height) / 2;
+      const centerPosition = { 
+        x: baseRect.left + baseRect.width / 2, 
+        y: baseRect.top + baseRect.height / 2 
+      };
+
       const touchX = touch.clientX - centerPosition.x;
       const touchY = touch.clientY - centerPosition.y;
       
@@ -506,6 +513,7 @@ const config = {
     actionBtn.addEventListener('mousedown', handleActionStart);
     actionBtn.addEventListener('mouseup', handleActionEnd);
     actionBtn.addEventListener('mouseleave', handleActionEnd);
+    controlsInitialized = true;
   }
   
   // Renderização
@@ -668,13 +676,24 @@ const config = {
   // Event listeners
   window.addEventListener('load', () => {
     // Verifica se é mobile e mostra os controles
-    if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
-      document.getElementById('mobile-controls').style.display = 'flex';
+    const mobileControls = document.getElementById('mobile-controls');
+    const isMobileView = isMobileDevice() || window.matchMedia('(max-width: 900px)').matches;
+    if (isMobileView && mobileControls) {
+      mobileControls.style.display = 'flex';
     }
     
     setupControls();
-    const controlsHeight = document.getElementById('mobile-controls').offsetHeight;
-    elements.canvas.style.marginBottom = `${controlsHeight + 20}px`;
+    const updateLayoutSpacing = () => {
+      if (!mobileControls) return;
+      setupControls();
+      const controlsHeight = mobileControls.getBoundingClientRect().height || 0;
+      elements.canvas.style.marginBottom = controlsHeight > 0 
+        ? `${controlsHeight + 20}px`
+        : '20px';
+    };
+
+    updateLayoutSpacing();
+    window.addEventListener('resize', updateLayoutSpacing);
   });
 
 
