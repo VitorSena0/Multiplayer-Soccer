@@ -41,7 +41,7 @@ const config = {
       roomPlayerCount: 0,
       requestedRoomId: null,
       ping: null, // Latência em ms
-    inputs: { left: false, right: false, up: false, down: false, action: false },
+    inputs: { left: false, right: false, up: false, down: false },
     gameState: {
       players: {},
       ball: { x: 400, y: 300, radius: config.ball.radius, speedX: 0, speedY: 0 },
@@ -394,9 +394,8 @@ const config = {
   
     const joystickThumb = document.getElementById('joystick-thumb');
     const joystickBase = document.getElementById('joystick-base');
-    const actionBtn = document.getElementById('action-btn');
     
-    if (!joystickThumb || !joystickBase || !actionBtn) {
+    if (!joystickThumb || !joystickBase) {
       console.warn('Elementos de controle móvel não encontrados');
       return;
     }
@@ -489,23 +488,6 @@ const config = {
         resetJoystick();
       }
     });
-  
-    // Botão de ação
-    const handleActionStart = () => {
-      state.inputs.action = true;
-      actionBtn.style.backgroundColor = 'rgba(255, 0, 0, 0.6)';
-    };
-    
-    const handleActionEnd = () => {
-      state.inputs.action = false;
-      actionBtn.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-    };
-  
-    actionBtn.addEventListener('touchstart', handleActionStart);
-    actionBtn.addEventListener('touchend', handleActionEnd);
-    actionBtn.addEventListener('mousedown', handleActionStart);
-    actionBtn.addEventListener('mouseup', handleActionEnd);
-    actionBtn.addEventListener('mouseleave', handleActionEnd);
   }
   
   // Renderização
