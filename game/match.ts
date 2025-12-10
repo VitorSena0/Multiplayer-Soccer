@@ -1,8 +1,9 @@
-const { MATCH_DURATION } = require('./constants');
-const { buildGameState } = require('./roomManager');
-const { resetBall } = require('./ball');
+import { MATCH_DURATION } from './constants';
+import { buildGameState } from './roomManager';
+import { resetBall } from './ball';
+import { Room, GameIO, GameSocket } from './types';
 
-function balanceTeams(room, io) {
+export function balanceTeams(room: Room, io: GameIO): void {
     const redCount = room.teams.red.length;
     const blueCount = room.teams.blue.length;
 
@@ -11,17 +12,17 @@ function balanceTeams(room, io) {
     }
 
     const [largerTeam, smallerTeam] = redCount > blueCount ? ['red', 'blue'] : ['blue', 'red'];
-    const playerToMove = room.teams[largerTeam].pop();
+    const playerToMove = room.teams[largerTeam as 'red' | 'blue'].pop();
 
     if (!playerToMove) {
         return;
     }
 
-    room.teams[smallerTeam].push(playerToMove);
+    room.teams[smallerTeam as 'red' | 'blue'].push(playerToMove);
 
     const player = room.players[playerToMove];
     if (player) {
-        player.team = smallerTeam;
+        player.team = smallerTeam as 'red' | 'blue';
         player.x = smallerTeam === 'red' ? 100 : room.width - 100;
         player.y = room.height / 2;
 
@@ -35,7 +36,7 @@ function balanceTeams(room, io) {
     }
 }
 
-function startNewMatch(room, io) {
+export function startNewMatch(room: Room, io: GameIO): void {
     room.isPlaying = true;
     room.waitingForRestart = false;
     room.playersReady.clear();
@@ -56,7 +57,7 @@ function startNewMatch(room, io) {
     });
 }
 
-function checkRestartConditions(room, io) {
+export function checkRestartConditions(room: Room, io: GameIO): void {
     balanceTeams(room, io);
 
     const hasRedPlayers = room.teams.red.length > 0;
@@ -75,7 +76,7 @@ function checkRestartConditions(room, io) {
     }
 }
 
-function updateTimer(room, io) {
+export function updateTimer(room: Room, io: GameIO): void {
     if (!room.isPlaying) {
         return;
     }
@@ -105,9 +106,3 @@ function updateTimer(room, io) {
 
     io.to(room.id).emit('timerUpdate', { matchTime: room.matchTime });
 }
-
-module.exports = {
-    startNewMatch,
-    checkRestartConditions,
-    updateTimer,
-};

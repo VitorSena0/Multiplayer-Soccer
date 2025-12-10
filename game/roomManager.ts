@@ -1,11 +1,11 @@
-const { BALL_RADIUS, MATCH_DURATION, MAX_PLAYERS_PER_ROOM } = require('./constants');
+import { BALL_RADIUS, MATCH_DURATION, MAX_PLAYERS_PER_ROOM } from './constants';
+import { Room, Ball, GameState, RoomAllocationResult } from './types';
 
-const rooms = new Map(); // Mapa que armazena as salas de jogo, onde a chave é o ID da sala e o valor é o estado da sala
+export const rooms = new Map<string, Room>(); // Mapa que armazena as salas de jogo, onde a chave é o ID da sala e o valor é o estado da sala
 let roomSequence = 1;
 
-
 // Função que retorna o estado inicial padrão da bola em uma sala
-const defaultBallState = () => ({
+const defaultBallState = (): Ball => ({
     x: 400,
     y: 300,
     radius: BALL_RADIUS,
@@ -14,7 +14,7 @@ const defaultBallState = () => ({
 });
 
 // Função que sanitiza o ID da sala para garantir que esteja em um formato válido, ex: "room-1"
-function sanitizeRoomId(roomId) {
+function sanitizeRoomId(roomId: string | undefined | null): string | null {
     if (typeof roomId !== 'string') return null;
     const trimmed = roomId.trim().toLowerCase(); // Remove espaços em branco e converte para minúsculas
     if (!trimmed) return null;
@@ -25,19 +25,18 @@ function sanitizeRoomId(roomId) {
     return normalized || null; // Retorna null se o ID resultante for uma string vazia
 }
 
-
 // Função que gera um ID único para uma nova sala
-function generateRoomId() {
-    let candidate; // Variável para armazenar o ID candidato
+function generateRoomId(): string {
+    let candidate: string; // Variável para armazenar o ID candidato
     do {
         candidate = `room-${roomSequence++}`; // Gera um ID no formato "room-<número sequencial>"
     } while (rooms.has(candidate)); // Verifica se o ID já existe; se existir, gera outro
     return candidate;
 }
 
-function createRoom(roomId = generateRoomId()) {
+export function createRoom(roomId: string = generateRoomId()): Room {
     const id = rooms.has(roomId) ? generateRoomId() : roomId; // Se o ID fornecido já existir, gera um novo ID
-    const roomState = {
+    const roomState: Room = {
         id,
         width: 800,
         height: 600,
@@ -53,7 +52,7 @@ function createRoom(roomId = generateRoomId()) {
         lastGoalTime: 0, // Timestamp do último gol marcado
         goalCooldown: 500,
         waitingForRestart: false,
-        playersReady: new Set(), // Conjunto para rastrear jogadores prontos para reiniciar o jogo
+        playersReady: new Set<string>(), // Conjunto para rastrear jogadores prontos para reiniciar o jogo
     };
     rooms.set(id, roomState);
     console.log(`Sala criada: ${id}`);
@@ -61,12 +60,12 @@ function createRoom(roomId = generateRoomId()) {
 }
 
 // Função que retorna o número de jogadores em uma sala
-function getPlayerCount(room) {
+export function getPlayerCount(room: Room): number {
     return Object.keys(room.players).length;
 }
 
 // Função que retorna uma sala disponível ou cria uma nova se todas estiverem cheias
-function getOrCreateAvailableRoom() {
+export function getOrCreateAvailableRoom(): Room {
     for (const room of rooms.values()) {
         if (getPlayerCount(room) < MAX_PLAYERS_PER_ROOM) {
             return room;
@@ -75,9 +74,8 @@ function getOrCreateAvailableRoom() {
     return createRoom();
 }
 
-
 // Função que aloca uma sala com base no ID solicitado ou cria uma nova se necessário
-function allocateRoom(requestedRoomId) { // requestedRoomId é do tipo string ou undefined
+export function allocateRoom(requestedRoomId?: string): RoomAllocationResult {
     if (requestedRoomId) {
         const sanitized = sanitizeRoomId(requestedRoomId);
         if (!sanitized) {
@@ -94,7 +92,7 @@ function allocateRoom(requestedRoomId) { // requestedRoomId é do tipo string ou
 }
 
 // Função que constrói o estado do jogo a ser enviado aos clientes
-function buildGameState(room) {
+export function buildGameState(room: Room): GameState {
     return {
         width: room.width,
         height: room.height,
@@ -109,19 +107,9 @@ function buildGameState(room) {
 }
 
 // Função que remove a sala se estiver vazia
-function cleanupRoomIfEmpty(room) {
+export function cleanupRoomIfEmpty(room: Room): void {
     if (room && getPlayerCount(room) === 0) {
         rooms.delete(room.id);
         console.log(`Sala removida: ${room.id}`);
     }
 }
-
-module.exports = {
-    rooms,
-    allocateRoom,
-    createRoom,
-    getPlayerCount,
-    getOrCreateAvailableRoom,
-    buildGameState,
-    cleanupRoomIfEmpty,
-};

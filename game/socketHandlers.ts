@@ -1,10 +1,11 @@
-const { MAX_PLAYERS_PER_ROOM } = require('./constants');
-const { allocateRoom, buildGameState, cleanupRoomIfEmpty } = require('./roomManager');
-const { checkRestartConditions, startNewMatch } = require('./match');
+import { MAX_PLAYERS_PER_ROOM } from './constants';
+import { allocateRoom, buildGameState, cleanupRoomIfEmpty } from './roomManager';
+import { checkRestartConditions, startNewMatch } from './match';
+import { GameIO, PlayerInput } from './types';
 
-function registerSocketHandlers(io) {
+export function registerSocketHandlers(io: GameIO): void {
     io.on('connection', (socket) => {
-        const requestedRoomId = socket.handshake.query?.roomId;
+        const requestedRoomId = socket.handshake.query?.roomId as string | undefined;
         const allocation = allocateRoom(requestedRoomId);
 
         if (allocation.error === 'room-full') {
@@ -16,7 +17,7 @@ function registerSocketHandlers(io) {
             return;
         }
 
-        const room = allocation.room;
+        const room = allocation.room!;
         socket.join(room.id);
         socket.data.roomId = room.id;
 
@@ -85,7 +86,7 @@ function registerSocketHandlers(io) {
             });
         });
 
-        socket.on('input', (input) => {
+        socket.on('input', (input: PlayerInput) => {
             if (room.players[socket.id] && room.isPlaying) {
                 room.players[socket.id].input = input;
             }
@@ -114,7 +115,3 @@ function registerSocketHandlers(io) {
         });
     });
 }
-
-module.exports = {
-    registerSocketHandlers,
-};

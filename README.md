@@ -88,15 +88,16 @@ Para testar localmente, veja a seção [Instalação e Execução Local](#instal
 
 ## Tecnologias Utilizadas
 
-- **Linguagem**: JavaScript (Node.js no back-end e JS puro no front-end).
+- **Linguagem**: TypeScript (compilado para JavaScript no back-end e front-end).
 - **Servidor**:
 	- Node.js 18+
+	- TypeScript
 	- Express
 	- Socket.IO
 - **Cliente**:
 	- HTML5
 	- CSS3
-	- JavaScript (Canvas / DOM)
+	- TypeScript (compilado para JavaScript, Canvas / DOM)
 - **Infra / Deploy**:
 	- Docker / Docker Compose
 	- Nginx (como proxy reverso)
@@ -133,10 +134,16 @@ Na raiz do projeto:
 # Instalar dependências
 npm install
 
+# Compilar o código TypeScript
+npm run build
+
 # Executar o servidor
 npm run start
 # ou
-node game-server.js
+node dist/game-server.js
+
+# Para desenvolvimento com recompilação automática
+npm run dev
 ```
 
 O servidor, por padrão, escuta em `PORT` (se definida) ou `3000`.
@@ -145,7 +152,7 @@ Abra no navegador:
 
 - `http://localhost:3000`
 
-O front-end é servido automaticamente a partir da pasta `public/`.
+O front-end é servido automaticamente a partir da pasta `public/`. O código TypeScript é compilado para JavaScript nas pastas `dist/` (servidor) e `public/dist/` (cliente).
 
 ---
 
@@ -172,20 +179,20 @@ A lógica de salas está em `game/roomManager.js`.
 **Balanceamento de times**:
 
 - O servidor tenta manter a diferença de jogadores entre os times `red` e `blue` em **no máximo 1**.
-- Quando necessário, jogadores podem ser realocados de um time para outro (lógica em `game/match.js`).
+- Quando necessário, jogadores podem ser realocados de um time para outro (lógica em `game/match.ts`).
 
 ---
 
 ## Regras de Partida e Temporizador
 
-A lógica de partida está em `game/match.js`:
+A lógica de partida está em `game/match.ts`:
 
 - **Início/Reinício de partida**:
 	- A partida é iniciada quando há ao menos um jogador em cada time.
 	- Ao reiniciar, o servidor:
 		- Zera o cronômetro.
 		- Reseta posições de todos os jogadores.
-		- Chama `resetBall` para reposicionar a bola (ver `game/ball.js`).
+		- Chama `resetBall` para reposicionar a bola (ver `game/ball.ts`).
 - **Temporizador**:
 	- Atualizado pela função `updateTimer(room, io)` a cada 1 segundo.
 	- Emite o evento `timerUpdate` com `matchTime` para todos da sala.
@@ -205,31 +212,34 @@ A lógica de partida está em `game/match.js`:
 
 ## Front-end (cliente)
 
-Os arquivos do cliente estão em `public/`:
+Os arquivos do cliente estão organizados da seguinte forma:
 
-- `public/index.html` — página principal do jogo.
-- `public/style.css` — estilos do campo, HUD, botões, etc.
-- `public/game.js` — lógica do cliente:
-	- Conecta ao Socket.IO do servidor.
-	- Envia inputs (teclas pressionadas) para o servidor.
-	- Renderiza o campo, jogadores, bola, placar e cronômetro.
-	- Trata eventos como:
-		- Snapshot de estado do jogo.
-		- Atualizações de timer.
+- **Código fonte TypeScript**: `src/client/game.ts` — lógica do cliente em TypeScript.
+- **Código compilado**: `public/dist/game.js` — código JavaScript compilado a partir do TypeScript.
+- **HTML**: `public/index.html` — página principal do jogo.
+- **Estilos**: `public/style.css` — estilos do campo, HUD, botões, etc.
+
+A lógica do cliente:
+- Conecta ao Socket.IO do servidor.
+- Envia inputs (teclas pressionadas) para o servidor.
+- Renderiza o campo, jogadores, bola, placar e cronômetro.
+- Trata eventos como:
+	- Snapshot de estado do jogo.
+	- Atualizações de timer.
 		- Mensagens de sala cheia, início/fim de partida, etc.
 
 ---
 
 ## Backend (servidor de jogo)
 
-Ponto de entrada: `game-server.js`.
+**Código fonte**: `game-server.ts` (compilado para `dist/game-server.js`).
 
 Responsabilidades principais:
 
 - Criar o servidor HTTP (`http.createServer(app)`).
-- Plugar o Socket.IO (`const io = socketio(server, { ... })`).
+- Plugar o Socket.IO (`const io = new SocketIOServer(server, { ... })`).
 - Servir arquivos estáticos da pasta `public/` via Express.
-- Registrar os handlers de Socket.IO (`game/socketHandlers.js`).
+- Registrar os handlers de Socket.IO (`game/socketHandlers.ts`).
 - Executar o game loop e o timer:
 
 	- `runGameLoops()`:
@@ -239,14 +249,15 @@ Responsabilidades principais:
 		- Percorre todas as salas e chama `updateTimer(room, io)`.
 		- Rodando a cada **1 segundo** (`setInterval(handleTimers, 1000)`).
 
-Outros módulos importantes:
+Outros módulos importantes (código TypeScript em `game/`, compilado para `dist/game/`):
 
-- `game/constants.js` — constantes de jogo (tamanhos, duração, limites).
-- `game/roomManager.js` — criação, alocação e limpeza de salas.
-- `game/match.js` — temporizador, início/fim de partida, balanceamento de times.
-- `game/ball.js` — estado e reposicionamento da bola, cantos.
-- `game/gameLoop.js` — lógica central de atualização a cada tick.
-- `game/socketHandlers.js` — mapeamento de eventos Socket.IO (conexão, desconexão, inputs, “jogar novamente” etc.).
+- `game/types.ts` — definições de tipos TypeScript para o jogo.
+- `game/constants.ts` — constantes de jogo (tamanhos, duração, limites).
+- `game/roomManager.ts` — criação, alocação e limpeza de salas.
+- `game/match.ts` — temporizador, início/fim de partida, balanceamento de times.
+- `game/ball.ts` — estado e reposicionamento da bola, cantos.
+- `game/gameLoop.ts` — lógica central de atualização a cada tick.
+- `game/socketHandlers.ts` — mapeamento de eventos Socket.IO (conexão, desconexão, inputs, “jogar novamente” etc.).
 
 ---
 
@@ -256,24 +267,37 @@ Estrutura simplificada do repositório:
 
 ```text
 Multiplayer-Soccer/
-├─ game-server.js         # Ponto de entrada do servidor Node/Express/Socket.IO
+├─ game-server.ts         # Código fonte TypeScript do servidor
 ├─ package.json           # Metadados e scripts npm
+├─ tsconfig.json          # Configuração TypeScript do servidor
+├─ tsconfig.client.json   # Configuração TypeScript do cliente
 ├─ dockerfile             # Dockerfile do app Node
 ├─ docker-compose.yml     # Compose para subir app + nginx
 ├─ README.md              # Este arquivo
 │
-├─ game/                  # Lado servidor: lógica de jogo
-│  ├─ constants.js
-│  ├─ roomManager.js
-│  ├─ match.js
-│  ├─ ball.js
-│  ├─ gameLoop.js
-│  └─ socketHandlers.js
+├─ game/                  # Código fonte TypeScript: lógica de jogo do servidor
+│  ├─ types.ts
+│  ├─ constants.ts
+│  ├─ roomManager.ts
+│  ├─ match.ts
+│  ├─ ball.ts
+│  ├─ gameLoop.ts
+│  └─ socketHandlers.ts
 │
-├─ public/                # Lado cliente (front-end)
+├─ src/
+│  └─ client/             # Código fonte TypeScript do cliente
+│     └─ game.ts
+│
+├─ dist/                  # Código JavaScript compilado do servidor (gerado)
+│  ├─ game-server.js
+│  └─ game/
+│
+├─ public/                # Arquivos estáticos do front-end
 │  ├─ index.html
 │  ├─ style.css
-│  └─ game.js
+│  ├─ style.css
+│  └─ dist/              # Código JavaScript compilado do cliente (gerado)
+│     └─ game.js
 │
 ├─ nginx/                 # Configuração Nginx para proxy reverso
 │  ├─ default.conf

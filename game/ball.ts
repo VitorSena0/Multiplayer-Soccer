@@ -1,6 +1,7 @@
-const { BALL_RADIUS, CORNER_SIZE } = require('./constants');
+import { BALL_RADIUS, CORNER_SIZE } from './constants';
+import { Room, Ball, CornerDefinition, GameIO } from './types';
 
-function resetBall(room, io) {
+export function resetBall(room: Room, io: GameIO): void {
     const thirdWidth = room.width / 3;
     const minX = room.width / 2 - thirdWidth / 2;
     const maxX = room.width / 2 + thirdWidth / 2;
@@ -21,29 +22,29 @@ function resetBall(room, io) {
     io.to(room.id).emit('ballReset', { ball: room.ball });
 }
 
-function getCornerDefinitions(room) {
+function getCornerDefinitions(room: Room): CornerDefinition[] {
     const cs = CORNER_SIZE;
     return [
         {
-            region: (ball) => ball.x < cs && ball.y < cs,
+            region: (ball: Ball) => ball.x < cs && ball.y < cs,
             p1: { x: 0, y: cs },
             p2: { x: cs, y: 0 },
             inside: { x: cs * 2, y: cs * 2 },
         },
         {
-            region: (ball) => ball.x > room.width - cs && ball.y < cs,
+            region: (ball: Ball) => ball.x > room.width - cs && ball.y < cs,
             p1: { x: room.width - cs, y: 0 },
             p2: { x: room.width, y: cs },
             inside: { x: Math.max(room.width - cs * 2, room.width / 2), y: cs * 2 },
         },
         {
-            region: (ball) => ball.x < cs && ball.y > room.height - cs,
+            region: (ball: Ball) => ball.x < cs && ball.y > room.height - cs,
             p1: { x: 0, y: room.height - cs },
             p2: { x: cs, y: room.height },
             inside: { x: cs * 2, y: Math.max(room.height - cs * 2, room.height / 2) },
         },
         {
-            region: (ball) => ball.x > room.width - cs && ball.y > room.height - cs,
+            region: (ball: Ball) => ball.x > room.width - cs && ball.y > room.height - cs,
             p1: { x: room.width - cs, y: room.height },
             p2: { x: room.width, y: room.height - cs },
             inside: {
@@ -54,7 +55,7 @@ function getCornerDefinitions(room) {
     ];
 }
 
-function enforceCornerBoundaries(room) {
+export function enforceCornerBoundaries(room: Room): void {
     const corners = getCornerDefinitions(room);
     const ball = room.ball;
 
@@ -92,8 +93,3 @@ function enforceCornerBoundaries(room) {
         break;
     }
 }
-
-module.exports = {
-    resetBall,
-    enforceCornerBoundaries,
-};

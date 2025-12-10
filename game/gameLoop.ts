@@ -1,7 +1,8 @@
-const { PLAYER_RADIUS, BALL_RADIUS, GOAL_HEIGHT, GOAL_WIDTH } = require('./constants');
-const { enforceCornerBoundaries, resetBall } = require('./ball');
+import { PLAYER_RADIUS, BALL_RADIUS, GOAL_HEIGHT, GOAL_WIDTH } from './constants';
+import { enforceCornerBoundaries, resetBall } from './ball';
+import { Room, GameIO } from './types';
 
-function gameLoop(room, io) {
+export function gameLoop(room: Room, io: GameIO): void {
     if (!room.isPlaying) {
         return;
     }
@@ -110,7 +111,3 @@ function gameLoop(room, io) {
         roomId: room.id,
     });
 }
-
-module.exports = {
-    gameLoop,
-};
