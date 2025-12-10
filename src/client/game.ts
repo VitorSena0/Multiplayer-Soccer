@@ -1,8 +1,11 @@
 // Tipos para Socket.IO no lado do cliente
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SocketEventData = any; // Socket.IO events can have various data structures
+
 interface Socket {
   id: string;
-  on(event: string, callback: (data: any) => void): void;
-  emit(event: string, data?: any): void;
+  on(event: string, callback: (data: SocketEventData) => void): void;
+  emit(event: string, data?: SocketEventData): void;
   disconnect(): void;
 }
 
@@ -294,8 +297,8 @@ const socket: Socket = io(window.location.origin, {
 });
 
 // Handlers de socket
-const socketHandlers = {
-  init: (data: any) => {
+const socketHandlers: Record<string, (data: SocketEventData) => void> = {
+  init: (data: SocketEventData) => {
     state.currentTeam = data.team;
     state.gameState = { ...state.gameState, ...data.gameState };
     state.canMove = data.canMove;
@@ -308,7 +311,7 @@ const socketHandlers = {
     updateUI();
   },
 
-  roomAssigned: (data: any) => {
+  roomAssigned: (data: SocketEventData) => {
     state.roomId = data.roomId;
     state.roomCapacity = data.capacity;
     state.roomPlayerCount = data.players;
@@ -316,7 +319,7 @@ const socketHandlers = {
     updateRoomInfoDisplay();
   },
 
-  roomFull: (data: any) => {
+  roomFull: (data: SocketEventData) => {
     const message = `Sala ${data.roomId} está cheia (${data.capacity} jogadores). Escolha outra sala.`;
     elements.waitingScreen.style.display = 'block';
     elements.waitingScreen.textContent = message;
@@ -324,7 +327,7 @@ const socketHandlers = {
     alert(message);
   },
 
-  playerConnected: (data: any) => {
+  playerConnected: (data: SocketEventData) => {
     if (state.gameState.teams.red.length + state.gameState.teams.blue.length < 2) {
       elements.winnerDisplay.textContent = '';
       elements.winnerDisplay.style.display = 'none';
@@ -363,7 +366,7 @@ const socketHandlers = {
     draw();
   },
 
-  matchStart: (data: any) => {
+  matchStart: (data: SocketEventData) => {
     state.gameState = { ...state.gameState, ...data.gameState, isPlaying: true };
     state.matchEnded = false;
     state.canMove = true;
@@ -373,7 +376,7 @@ const socketHandlers = {
     updateUI();
   },
 
-  playerReadyUpdate: (data: any) => {
+  playerReadyUpdate: (data: SocketEventData) => {
     state.gameState.players = data.players;
     state.roomPlayerCount = Object.keys(state.gameState.players).length;
     updateRoomInfoDisplay();
@@ -393,7 +396,7 @@ const socketHandlers = {
     elements.restartButton.style.display = 'none';
   },
 
-  teamChanged: (data: any) => {
+  teamChanged: (data: SocketEventData) => {
     state.currentTeam = data.newTeam;
     state.gameState = data.gameState;
     if (state.gameState.players[socket.id]) {
@@ -404,7 +407,7 @@ const socketHandlers = {
     updateUI();
   },
 
-  playerDisconnected: (data: any) => {
+  playerDisconnected: (data: SocketEventData) => {
     state.gameState = data.gameState;
     delete state.gameState.players[data.playerId];
     state.roomPlayerCount = Object.keys(state.gameState.players).length;
@@ -419,7 +422,7 @@ const socketHandlers = {
     }
   },
 
-  matchEnd: (data: any) => {
+  matchEnd: (data: SocketEventData) => {
     state.gameState.isPlaying = false;
     state.matchEnded = true;
     state.gameState.players = data.gameState.players;
@@ -431,12 +434,12 @@ const socketHandlers = {
     elements.waitingScreen.style.display = 'block';
   },
 
-  timerUpdate: (data: any) => {
+  timerUpdate: (data: SocketEventData) => {
     state.gameState.matchTime = data.matchTime;
     updateTimerDisplay();
   },
 
-  waitingForPlayers: (data: any) => {
+  waitingForPlayers: (data: SocketEventData) => {
     const waitingText = `Aguardando jogadores... Vermelho: ${data.redCount} | Azul: ${data.blueCount}`;
     elements.waitingScreen.textContent = waitingText;
     elements.waitingScreen.style.display = 'block';
@@ -446,13 +449,13 @@ const socketHandlers = {
     updateUI();
   },
 
-  goalScored: (data: any) => {
+  goalScored: (data: SocketEventData) => {
     state.gameState.ball.x = -1000;
     state.gameState.ball.y = -1000;
     console.log(`GOL do time ${data.team}!`);
   },
 
-  ballReset: (data: any) => {
+  ballReset: (data: SocketEventData) => {
     state.gameState.ball = data.ball;
   },
 };
