@@ -1,6 +1,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 
 // Definição de tipos para o jogador
+// Note: O cliente pode enviar campos adicionais como 'action', mas o servidor apenas usa os direcionais
 export interface PlayerInput {
     left: boolean;
     right: boolean;

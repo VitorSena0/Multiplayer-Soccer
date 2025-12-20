@@ -306,7 +306,7 @@ updateRoomInfoDisplay();
 // - Enviamos opcionalmente o roomId desejado
 // - O servidor decide se aloca em uma sala existente ou cria outra
 // ===============================
-declare const io: any; // Socket.IO é carregado via CDN no HTML
+// Socket.IO é carregado via CDN no HTML e tipos são fornecidos por @types/socket.io-client
 
 const socket = io(window.location.origin, {
   query: { roomId: state.requestedRoomId || '' },
