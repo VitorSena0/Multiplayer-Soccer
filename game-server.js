@@ -1,4 +1,4 @@
-const express = require('express'); // Serve para criar o servidor web
+const express = require('express'); // Freamework web servir arquivos estáticos e gerenciar rotas
 const socketio = require('socket.io'); // Biblioteca para comunicação em tempo real via WebSockets
 const http = require('http'); // Módulo nativo do Node.js para criar servidores HTTP
 

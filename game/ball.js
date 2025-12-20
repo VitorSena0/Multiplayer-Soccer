@@ -54,6 +54,7 @@ function getCornerDefinitions(room) {
     ];
 }
 
+// Aplica restrições de colisão da bola com os cantos da arena
 function enforceCornerBoundaries(room) {
     const corners = getCornerDefinitions(room);
     const ball = room.ball;

@@ -1,3 +1,8 @@
+// ===============================
+// Configuração base do jogo
+// - Tamanhos de canvas, campo, jogadores, bola e gols
+// - Esses valores são usados em vários pontos (desenho, colisão, etc.)
+// ===============================
 // Configuração do jogo
 const config = {
   canvas: {
@@ -19,7 +24,11 @@ const config = {
   },
 };
 
+// ===============================
 // Elementos do DOM
+// - Criamos tudo via JavaScript para deixar o index.html mais limpo
+// - `container` agrupa canvas, HUD e telas de feedback (espera, vencedor, etc.)
+// ===============================
 const elements = {
   container: document.createElement('div'),
   canvas: document.createElement('canvas'),
@@ -34,7 +43,12 @@ const elements = {
   timerBottom: document.createElement('div'),
 };
 
-// Estado do jogo
+// ===============================
+// Estado do jogo (client-side)
+// - Guarda informações que o cliente precisa para desenhar e interagir
+// - `gameState` é sincronizado pelo servidor via Socket.IO
+// - `inputs` guarda o que o jogador está apertando no momento
+// ===============================
 const state = {
   matchEnded: false,
   canMove: false,
@@ -64,7 +78,8 @@ function getRequestedRoomId() {
   return value ? value.trim() : null;
 }
 
-// Verifica se o dispositivo é móvel
+// Verifica se o dispositivo é móvel (touch)
+// Usado para decidir se mostramos controles de joystick na tela
 function isMobileDevice() {
   return (
     'ontouchstart' in window ||
@@ -73,7 +88,10 @@ function isMobileDevice() {
   );
 }
 
-// Inicialização do canvas e container
+// Inicialização do canvas e container principal do jogo
+// - Cria o contexto 2D
+// - Ajusta o tamanho “lógico” do canvas
+// - Faz um resize inicial para caber melhor na tela do usuário
 function initCanvas() {
   const ctx = elements.canvas.getContext('2d');
 
@@ -89,6 +107,8 @@ function initCanvas() {
   return ctx;
 }
 
+// Ajusta o tamanho VISUAL do canvas (CSS) mantendo a proporção
+// O tamanho lógico (config.canvas.width/height) continua o mesmo
 function resizeCanvasForViewport() {
   const aspect = config.canvas.width / config.canvas.height;
   const maxWidth = Math.min(window.innerWidth - 24, 900);
@@ -99,6 +119,8 @@ function resizeCanvasForViewport() {
 }
 
 // Atualiza o display de ping
+// - Se ainda não medimos, mostra "-- ms"
+// - Depois que o servidor responde, mostra a latência medida
 function atualizarDisplayPing() {
   if (!elements.ping) return;
   if (state.ping === null) {
@@ -111,7 +133,12 @@ function atualizarDisplayPing() {
 const ctx = initCanvas();
 state.isMobile = isMobileDevice();
 
+// ===============================
 // Inicialização da UI
+// - Cria HUD inferior (ping, cronômetro, placar)
+// - Cria elementos de texto (esperando jogador, vencedor, info da sala)
+// - Tudo é anexado ao `elements.container`
+// ===============================
 function initUI() {
   elements.ping.id = 'ping';
   elements.ping.textContent = 'Ping: -- ms';
@@ -153,6 +180,8 @@ atualizarDisplayPing();
 state.requestedRoomId = getRequestedRoomId();
 state.roomId = state.requestedRoomId;
 
+// Salva o ID da sala na URL (?room=XYZ)
+// Assim o jogador pode recarregar a página ou compartilhar o link
 function persistRoomInUrl(roomId) {
   if (!roomId) return;
   const params = new URLSearchParams(window.location.search);
@@ -162,6 +191,8 @@ function persistRoomInUrl(roomId) {
   state.requestedRoomId = roomId;
 }
 
+// Atualiza o texto que mostra qual sala o jogador está
+// Ex.: "Sala abc123 (1/4)"
 function updateRoomInfoDisplay() {
   if (!elements.roomInfo) return;
   if (!state.roomId) {
@@ -175,12 +206,19 @@ function updateRoomInfoDisplay() {
 
 updateRoomInfoDisplay();
 
-// Conexão com o servidor
+// ===============================
+// Conexão com o servidor (Socket.IO)
+// - Enviamos opcionalmente o roomId desejado
+// - O servidor decide se aloca em uma sala existente ou cria outra
+// ===============================
 const socket = io(window.location.origin, {
   query: { roomId: state.requestedRoomId || '' },
 });
 
-// Handlers de socket
+// ===============================
+// Handlers de eventos do Socket.IO
+// Cada chave do objeto abaixo corresponde a um evento vindo do servidor
+// ===============================
 const socketHandlers = {
   init: (data) => {
     state.currentTeam = data.team;
@@ -344,11 +382,14 @@ const socketHandlers = {
   },
 };
 
-// Registrar handlers
+// Registrar handlers de todos os eventos definidos acima
 Object.entries(socketHandlers).forEach(([event, handler]) => {
   socket.on(event, handler);
 });
 
+// Medição de ping
+// - O servidor envia o timestamp atual
+// - Calculamos a diferença para obter a latência aproximada
 socket.on('ping', (serverTimestamp) => {
   const now = Date.now();
   const latencia = now - serverTimestamp;
@@ -356,7 +397,9 @@ socket.on('ping', (serverTimestamp) => {
   atualizarDisplayPing();
 });
 
+// ===============================
 // Funções de UI
+// ===============================
 function updateUI() {
   updateRoomInfoDisplay();
   updateScoreboard();
@@ -373,11 +416,13 @@ function updateUI() {
   }
 }
 
+// Atualiza o texto do placar no HUD inferior
 function updateScoreboard() {
   if (!elements.scoreboard) return;
   elements.scoreboard.textContent = `Red: ${state.gameState.score.red} | Blue: ${state.gameState.score.blue}`;
 }
 
+// Desenha o ID de cada jogador acima da cabeça (ajustado ao tamanho do canvas na tela)
 function updatePlayerIDs() {
   document.querySelectorAll('.player-id').forEach((el) => el.remove());
 
@@ -417,6 +462,7 @@ function hideWinner() {
   }, 500);
 }
 
+// Atualiza o cronômetro mostrado no HUD inferior
 function updateTimerDisplay() {
   const minutes = Math.floor(state.gameState.matchTime / 60);
   const seconds = state.gameState.matchTime % 60;
@@ -424,7 +470,12 @@ function updateTimerDisplay() {
   elements.timerBottom.textContent = text;
 }
 
+// ===============================
 // Controles
+// - Configura joystick virtual para mobile
+// - Configura botão de ação (se visível)
+// - Atualiza o objeto `state.inputs` que será enviado ao servidor
+// ===============================
 function setupControls() {
   const mobileControls = document.getElementById('mobile-controls');
   if (!mobileControls) return;
@@ -563,7 +614,12 @@ function setupControls() {
   }
 }
 
-// Renderização
+// ===============================
+// Renderização principal do jogo
+// - Desenha campo, áreas, gols, jogadores e bola
+// - Chama `updatePlayerIDs` para alinhar labels com o canvas
+// - Usa `requestAnimationFrame(draw)` para animar continuamente
+// ===============================
 function draw() {
   try {
     ctx.clearRect(0, 0, config.canvas.width, config.canvas.height);
@@ -718,7 +774,9 @@ function draw() {
   requestAnimationFrame(draw);
 }
 
-// Event listeners
+// ===============================
+// Event listeners globais (carregamento, resize e teclado)
+// ===============================
 window.addEventListener('load', () => {
   if (state.isMobile || /Mobi|Android|iPhone/i.test(navigator.userAgent)) {
     const mobileControls = document.getElementById('mobile-controls');
@@ -731,6 +789,7 @@ window.addEventListener('load', () => {
   resizeCanvasForViewport();
 });
 
+// Redimensiona canvas e reposiciona labels quando a janela mudar de tamanho
 window.addEventListener('resize', () => {
   resizeCanvasForViewport();
   updatePlayerIDs();
@@ -772,6 +831,7 @@ window.addEventListener('keyup', (e) => {
   }
 });
 
+// Botão "Jogar Novamente" após o fim da partida
 elements.restartButton.addEventListener('click', () => {
   socket.emit('requestRestart');
   elements.restartButton.style.display = 'none';
@@ -779,11 +839,12 @@ elements.restartButton.addEventListener('click', () => {
 });
 
 // Loop de input
+// - A cada frame (~60 FPS) envia o estado atual das teclas para o servidor
 setInterval(() => {
   if (state.currentTeam !== 'spectator' && state.canMove) {
     socket.emit('input', state.inputs);
   }
 }, 1000 / 60);
 
-// Iniciar renderização
+// Inicia o loop de renderização do jogo
 draw();
