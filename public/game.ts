@@ -4,7 +4,27 @@
 // - Esses valores são usados em vários pontos (desenho, colisão, etc.)
 // ===============================
 // Configuração do jogo
-const config = {
+interface Config {
+  canvas: {
+    width: number;
+    height: number;
+  };
+  field: {
+    cornerSize: number;
+  };
+  player: {
+    radius: number;
+  };
+  ball: {
+    radius: number;
+  };
+  goal: {
+    width: number;
+    height: number;
+  };
+}
+
+const config: Config = {
   canvas: {
     width: 800,
     height: 600,
@@ -29,7 +49,21 @@ const config = {
 // - Criamos tudo via JavaScript para deixar o index.html mais limpo
 // - `container` agrupa canvas, HUD e telas de feedback (espera, vencedor, etc.)
 // ===============================
-const elements = {
+interface Elements {
+  container: HTMLDivElement;
+  canvas: HTMLCanvasElement;
+  ui: HTMLDivElement;
+  waitingScreen: HTMLDivElement;
+  winnerDisplay: HTMLDivElement;
+  restartButton: HTMLButtonElement;
+  roomInfo: HTMLDivElement;
+  ping: HTMLDivElement;
+  scoreboard: HTMLDivElement;
+  hudBottom: HTMLDivElement;
+  timerBottom: HTMLDivElement;
+}
+
+const elements: Elements = {
   container: document.createElement('div'),
   canvas: document.createElement('canvas'),
   ui: document.createElement('div'),
@@ -49,7 +83,65 @@ const elements = {
 // - `gameState` é sincronizado pelo servidor via Socket.IO
 // - `inputs` guarda o que o jogador está apertando no momento
 // ===============================
-const state = {
+interface PlayerInput {
+  left: boolean;
+  right: boolean;
+  up: boolean;
+  down: boolean;
+  action: boolean;
+}
+
+interface Ball {
+  x: number;
+  y: number;
+  radius: number;
+  speedX: number;
+  speedY: number;
+}
+
+interface Score {
+  red: number;
+  blue: number;
+}
+
+interface Teams {
+  red: string[];
+  blue: string[];
+}
+
+interface Player {
+  x: number;
+  y: number;
+  team: 'red' | 'blue';
+  input: Omit<PlayerInput, 'action'>;
+}
+
+interface GameState {
+  players: { [socketId: string]: Player };
+  ball: Ball;
+  score: Score;
+  teams: Teams;
+  matchTime: number;
+  isPlaying: boolean;
+  width: number;
+  height: number;
+}
+
+interface State {
+  matchEnded: boolean;
+  canMove: boolean;
+  currentTeam: 'red' | 'blue' | 'spectator';
+  roomId: string | null;
+  roomCapacity: number;
+  roomPlayerCount: number;
+  requestedRoomId: string | null;
+  ping: number | null;
+  inputs: PlayerInput;
+  gameState: GameState;
+  isMobile: boolean;
+}
+
+const state: State = {
   matchEnded: false,
   canMove: false,
   currentTeam: 'spectator',
@@ -72,7 +164,7 @@ const state = {
   isMobile: false,
 };
 
-function getRequestedRoomId() {
+function getRequestedRoomId(): string | null {
   const params = new URLSearchParams(window.location.search);
   const value = params.get('room');
   return value ? value.trim() : null;
@@ -80,20 +172,23 @@ function getRequestedRoomId() {
 
 // Verifica se o dispositivo é móvel (touch)
 // Usado para decidir se mostramos controles de joystick na tela
-function isMobileDevice() {
+function isMobileDevice(): boolean {
   return (
     'ontouchstart' in window ||
     navigator.maxTouchPoints > 0 ||
-    navigator.msMaxTouchPoints > 0
+    (navigator as any).msMaxTouchPoints > 0
   );
 }
 
 // Inicialização do canvas e container principal do jogo
 // - Cria o contexto 2D
-// - Ajusta o tamanho “lógico” do canvas
+// - Ajusta o tamanho "lógico" do canvas
 // - Faz um resize inicial para caber melhor na tela do usuário
-function initCanvas() {
+function initCanvas(): CanvasRenderingContext2D {
   const ctx = elements.canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Não foi possível obter o contexto 2D do canvas');
+  }
 
   elements.container.id = 'game-container';
   document.body.appendChild(elements.container);
@@ -109,7 +204,7 @@ function initCanvas() {
 
 // Ajusta o tamanho VISUAL do canvas (CSS) mantendo a proporção
 // O tamanho lógico (config.canvas.width/height) continua o mesmo
-function resizeCanvasForViewport() {
+function resizeCanvasForViewport(): void {
   const aspect = config.canvas.width / config.canvas.height;
   const maxWidth = Math.min(window.innerWidth - 24, 900);
   const width = Math.max(280, maxWidth);
@@ -121,7 +216,7 @@ function resizeCanvasForViewport() {
 // Atualiza o display de ping
 // - Se ainda não medimos, mostra "-- ms"
 // - Depois que o servidor responde, mostra a latência medida
-function atualizarDisplayPing() {
+function atualizarDisplayPing(): void {
   if (!elements.ping) return;
   if (state.ping === null) {
     elements.ping.textContent = 'Ping: -- ms';
@@ -139,7 +234,7 @@ state.isMobile = isMobileDevice();
 // - Cria elementos de texto (esperando jogador, vencedor, info da sala)
 // - Tudo é anexado ao `elements.container`
 // ===============================
-function initUI() {
+function initUI(): void {
   elements.ping.id = 'ping';
   elements.ping.textContent = 'Ping: -- ms';
 
@@ -182,7 +277,7 @@ state.roomId = state.requestedRoomId;
 
 // Salva o ID da sala na URL (?room=XYZ)
 // Assim o jogador pode recarregar a página ou compartilhar o link
-function persistRoomInUrl(roomId) {
+function persistRoomInUrl(roomId: string): void {
   if (!roomId) return;
   const params = new URLSearchParams(window.location.search);
   params.set('room', roomId);
@@ -193,7 +288,7 @@ function persistRoomInUrl(roomId) {
 
 // Atualiza o texto que mostra qual sala o jogador está
 // Ex.: "Sala abc123 (1/4)"
-function updateRoomInfoDisplay() {
+function updateRoomInfoDisplay(): void {
   if (!elements.roomInfo) return;
   if (!state.roomId) {
     elements.roomInfo.textContent = 'Conectando a uma sala...';
@@ -211,6 +306,8 @@ updateRoomInfoDisplay();
 // - Enviamos opcionalmente o roomId desejado
 // - O servidor decide se aloca em uma sala existente ou cria outra
 // ===============================
+// Socket.IO é carregado via CDN no HTML e tipos são fornecidos por @types/socket.io-client
+
 const socket = io(window.location.origin, {
   query: { roomId: state.requestedRoomId || '' },
 });
@@ -219,8 +316,86 @@ const socket = io(window.location.origin, {
 // Handlers de eventos do Socket.IO
 // Cada chave do objeto abaixo corresponde a um evento vindo do servidor
 // ===============================
+interface InitData {
+  team: 'red' | 'blue';
+  gameState: Partial<GameState>;
+  canMove: boolean;
+  roomId?: string;
+}
+
+interface RoomAssignedData {
+  roomId: string;
+  capacity: number;
+  players: number;
+}
+
+interface RoomFullData {
+  roomId: string;
+  capacity: number;
+}
+
+interface PlayerConnectedData {
+  playerId: string;
+  team: 'red' | 'blue';
+  gameState: { teams: Teams };
+}
+
+interface UpdateData {
+  players: { [socketId: string]: Player };
+  ball: Ball;
+  score: Score;
+  teams: Teams;
+  matchTime: number;
+  isPlaying: boolean;
+  roomId?: string;
+}
+
+interface MatchStartData {
+  gameState: Partial<GameState>;
+  canMove: boolean;
+}
+
+interface PlayerReadyUpdateData {
+  players: { [socketId: string]: Player };
+  readyCount: number;
+  totalPlayers: number;
+  canMove: boolean;
+}
+
+interface TeamChangedData {
+  newTeam: 'red' | 'blue';
+  gameState: GameState;
+}
+
+interface PlayerDisconnectedData {
+  playerId: string;
+  gameState: GameState;
+}
+
+interface MatchEndData {
+  winner: 'red' | 'blue' | 'draw';
+  gameState: GameState;
+}
+
+interface TimerUpdateData {
+  matchTime: number;
+}
+
+interface WaitingForPlayersData {
+  redCount: number;
+  blueCount: number;
+}
+
+interface GoalScoredData {
+  team: 'red' | 'blue';
+}
+
+interface BallResetData {
+  ball: Ball;
+}
+
 const socketHandlers = {
-  init: (data) => {
+  init: (data: InitData) => {
     state.currentTeam = data.team;
     state.gameState = { ...state.gameState, ...data.gameState };
     state.canMove = data.canMove;
@@ -233,7 +408,7 @@ const socketHandlers = {
     updateUI();
   },
 
-  roomAssigned: (data) => {
+  roomAssigned: (data: RoomAssignedData) => {
     state.roomId = data.roomId;
     state.roomCapacity = data.capacity;
     state.roomPlayerCount = data.players;
@@ -241,7 +416,7 @@ const socketHandlers = {
     updateRoomInfoDisplay();
   },
 
-  roomFull: (data) => {
+  roomFull: (data: RoomFullData) => {
     const message = `Sala ${data.roomId} está cheia (${data.capacity} jogadores). Escolha outra sala.`;
     elements.waitingScreen.style.display = 'block';
     elements.waitingScreen.textContent = message;
@@ -249,7 +424,7 @@ const socketHandlers = {
     alert(message);
   },
 
-  playerConnected: (data) => {
+  playerConnected: (data: PlayerConnectedData) => {
     if (state.gameState.teams.red.length + state.gameState.teams.blue.length < 2) {
       elements.winnerDisplay.textContent = '';
       elements.winnerDisplay.style.display = 'none';
@@ -269,7 +444,7 @@ const socketHandlers = {
     updateUI();
   },
 
-  update: (newState) => {
+  update: (newState: UpdateData) => {
     state.gameState = { ...state.gameState, ...newState };
     state.roomId = newState.roomId || state.roomId;
     state.roomPlayerCount = Object.keys(state.gameState.players).length;
@@ -288,7 +463,7 @@ const socketHandlers = {
     draw();
   },
 
-  matchStart: (data) => {
+  matchStart: (data: MatchStartData) => {
     state.gameState = { ...state.gameState, ...data.gameState, isPlaying: true };
     state.matchEnded = false;
     state.canMove = true;
@@ -298,7 +473,7 @@ const socketHandlers = {
     updateUI();
   },
 
-  playerReadyUpdate: (data) => {
+  playerReadyUpdate: (data: PlayerReadyUpdateData) => {
     state.gameState.players = data.players;
     state.roomPlayerCount = Object.keys(state.gameState.players).length;
     updateRoomInfoDisplay();
@@ -318,7 +493,7 @@ const socketHandlers = {
     elements.restartButton.style.display = 'none';
   },
 
-  teamChanged: (data) => {
+  teamChanged: (data: TeamChangedData) => {
     state.currentTeam = data.newTeam;
     state.gameState = data.gameState;
     if (state.gameState.players[socket.id]) {
@@ -329,7 +504,7 @@ const socketHandlers = {
     updateUI();
   },
 
-  playerDisconnected: (data) => {
+  playerDisconnected: (data: PlayerDisconnectedData) => {
     state.gameState = data.gameState;
     delete state.gameState.players[data.playerId];
     state.roomPlayerCount = Object.keys(state.gameState.players).length;
@@ -344,7 +519,7 @@ const socketHandlers = {
     }
   },
 
-  matchEnd: (data) => {
+  matchEnd: (data: MatchEndData) => {
     state.gameState.isPlaying = false;
     state.matchEnded = true;
     state.gameState.players = data.gameState.players;
@@ -356,12 +531,12 @@ const socketHandlers = {
     elements.waitingScreen.style.display = 'block';
   },
 
-  timerUpdate: (data) => {
+  timerUpdate: (data: TimerUpdateData) => {
     state.gameState.matchTime = data.matchTime;
     updateTimerDisplay();
   },
 
-  waitingForPlayers: (data) => {
+  waitingForPlayers: (data: WaitingForPlayersData) => {
     const waitingText = `Aguardando jogadores... Vermelho: ${data.redCount} | Azul: ${data.blueCount}`;
     elements.waitingScreen.textContent = waitingText;
     elements.waitingScreen.style.display = 'block';
@@ -371,13 +546,13 @@ const socketHandlers = {
     updateUI();
   },
 
-  goalScored: (data) => {
+  goalScored: (data: GoalScoredData) => {
     state.gameState.ball.x = -1000;
     state.gameState.ball.y = -1000;
     console.log(`GOL do time ${data.team}!`);
   },
 
-  ballReset: (data) => {
+  ballReset: (data: BallResetData) => {
     state.gameState.ball = data.ball;
   },
 };
@@ -390,7 +565,7 @@ Object.entries(socketHandlers).forEach(([event, handler]) => {
 // Medição de ping
 // - O servidor envia o timestamp atual
 // - Calculamos a diferença para obter a latência aproximada
-socket.on('ping', (serverTimestamp) => {
+socket.on('ping', (serverTimestamp: number) => {
   const now = Date.now();
   const latencia = now - serverTimestamp;
   state.ping = latencia;
@@ -400,7 +575,7 @@ socket.on('ping', (serverTimestamp) => {
 // ===============================
 // Funções de UI
 // ===============================
-function updateUI() {
+function updateUI(): void {
   updateRoomInfoDisplay();
   updateScoreboard();
   if (state.matchEnded) {
@@ -417,13 +592,13 @@ function updateUI() {
 }
 
 // Atualiza o texto do placar no HUD inferior
-function updateScoreboard() {
+function updateScoreboard(): void {
   if (!elements.scoreboard) return;
   elements.scoreboard.textContent = `Red: ${state.gameState.score.red} | Blue: ${state.gameState.score.blue}`;
 }
 
 // Desenha o ID de cada jogador acima da cabeça (ajustado ao tamanho do canvas na tela)
-function updatePlayerIDs() {
+function updatePlayerIDs(): void {
   document.querySelectorAll('.player-id').forEach((el) => el.remove());
 
   for (const [id, player] of Object.entries(state.gameState.players)) {
@@ -449,13 +624,13 @@ function updatePlayerIDs() {
   }
 }
 
-function showWinner(winner) {
+function showWinner(winner: 'red' | 'blue' | 'draw'): void {
   elements.winnerDisplay.style.display = 'block';
   elements.winnerDisplay.style.opacity = '1';
   elements.winnerDisplay.textContent = winner === 'draw' ? 'Empate!' : `Time ${winner.toUpperCase()} venceu!`;
 }
 
-function hideWinner() {
+function hideWinner(): void {
   elements.winnerDisplay.style.opacity = '0';
   setTimeout(() => {
     elements.winnerDisplay.style.display = 'none';
@@ -463,7 +638,7 @@ function hideWinner() {
 }
 
 // Atualiza o cronômetro mostrado no HUD inferior
-function updateTimerDisplay() {
+function updateTimerDisplay(): void {
   const minutes = Math.floor(state.gameState.matchTime / 60);
   const seconds = state.gameState.matchTime % 60;
   const text = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
@@ -476,7 +651,7 @@ function updateTimerDisplay() {
 // - Configura botão de ação (se visível)
 // - Atualiza o objeto `state.inputs` que será enviado ao servidor
 // ===============================
-function setupControls() {
+function setupControls(): void {
   const mobileControls = document.getElementById('mobile-controls');
   if (!mobileControls) return;
 
@@ -498,7 +673,7 @@ function setupControls() {
     return;
   }
 
-  let activeTouchId = null;
+  let activeTouchId: number | string | null = null;
   const joystickRadius = 50;
   let centerPosition = { x: 0, y: 0 };
 
@@ -511,7 +686,7 @@ function setupControls() {
   window.addEventListener('resize', recalcCenter);
   window.addEventListener('scroll', recalcCenter, { passive: true });
 
-  const updateJoystickPosition = (touch) => {
+  const updateJoystickPosition = (touch: { clientX: number; clientY: number }) => {
     const touchX = touch.clientX - centerPosition.x;
     const touchY = touch.clientY - centerPosition.y;
 
@@ -522,7 +697,7 @@ function setupControls() {
     const newX = Math.cos(angle) * limitedDistance;
     const newY = Math.sin(angle) * limitedDistance;
 
-    joystickThumb.style.transform = `translate(${newX}px, ${newY}px)`;
+    (joystickThumb as HTMLElement).style.transform = `translate(${newX}px, ${newY}px)`;
 
     const deadZone = 0.2;
     const normalizedX = newX / joystickRadius;
@@ -535,7 +710,7 @@ function setupControls() {
   };
 
   const resetJoystick = () => {
-    joystickThumb.style.transform = 'translate(0, 0)';
+    (joystickThumb as HTMLElement).style.transform = 'translate(0, 0)';
     activeTouchId = null;
     state.inputs.left = false;
     state.inputs.right = false;
@@ -543,7 +718,7 @@ function setupControls() {
     state.inputs.down = false;
   };
 
-  joystickBase.addEventListener('touchstart', (e) => {
+  joystickBase.addEventListener('touchstart', (e: TouchEvent) => {
     if (activeTouchId !== null) return;
     const touch = e.changedTouches[0];
     activeTouchId = touch.identifier;
@@ -554,7 +729,7 @@ function setupControls() {
 
   document.addEventListener(
     'touchmove',
-    (e) => {
+    (e: TouchEvent) => {
       if (activeTouchId === null) return;
       const touch = Array.from(e.changedTouches).find((t) => t.identifier === activeTouchId);
       if (touch) {
@@ -565,7 +740,7 @@ function setupControls() {
     { passive: false }
   );
 
-  document.addEventListener('touchend', (e) => {
+  document.addEventListener('touchend', (e: TouchEvent) => {
     const touch = Array.from(e.changedTouches).find((t) => t.identifier === activeTouchId);
     if (touch) {
       resetJoystick();
@@ -573,7 +748,7 @@ function setupControls() {
     }
   });
 
-  joystickBase.addEventListener('mousedown', (e) => {
+  joystickBase.addEventListener('mousedown', (e: MouseEvent) => {
     if (activeTouchId !== null) return;
     activeTouchId = 'mouse';
     recalcCenter();
@@ -581,7 +756,7 @@ function setupControls() {
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', (e) => {
+  document.addEventListener('mousemove', (e: MouseEvent) => {
     if (activeTouchId === 'mouse') {
       updateJoystickPosition(e);
       e.preventDefault();
@@ -620,7 +795,7 @@ function setupControls() {
 // - Chama `updatePlayerIDs` para alinhar labels com o canvas
 // - Usa `requestAnimationFrame(draw)` para animar continuamente
 // ===============================
-function draw() {
+function draw(): void {
   try {
     ctx.clearRect(0, 0, config.canvas.width, config.canvas.height);
 
@@ -795,7 +970,7 @@ window.addEventListener('resize', () => {
   updatePlayerIDs();
 });
 
-window.addEventListener('keydown', (e) => {
+window.addEventListener('keydown', (e: KeyboardEvent) => {
   if (!state.canMove || state.currentTeam === 'spectator' || state.matchEnded) return;
 
   switch (e.key) {
@@ -814,7 +989,7 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-window.addEventListener('keyup', (e) => {
+window.addEventListener('keyup', (e: KeyboardEvent) => {
   switch (e.key) {
     case 'ArrowLeft':
       state.inputs.left = false;
