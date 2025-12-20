@@ -1,8 +1,10 @@
-const { MATCH_DURATION } = require('./constants');
-const { buildGameState } = require('./roomManager');
-const { resetBall } = require('./ball');
+import { Server as SocketIOServer, Socket } from 'socket.io';
+import { MATCH_DURATION } from './constants';
+import { buildGameState } from './roomManager';
+import { resetBall } from './ball';
+import { Room, Player } from './types';
 
-function balanceTeams(room, io) {
+function balanceTeams(room: Room, io: SocketIOServer): void {
     const redCount = room.teams.red.length;
     const blueCount = room.teams.blue.length;
 
@@ -10,7 +12,7 @@ function balanceTeams(room, io) {
         return;
     }
 
-    const [largerTeam, smallerTeam] = redCount > blueCount ? ['red', 'blue'] : ['blue', 'red'];
+    const [largerTeam, smallerTeam]: ['red' | 'blue', 'red' | 'blue'] = redCount > blueCount ? ['red', 'blue'] : ['blue', 'red'];
     const playerToMove = room.teams[largerTeam].pop();
 
     if (!playerToMove) {
@@ -35,7 +37,7 @@ function balanceTeams(room, io) {
     }
 }
 
-function startNewMatch(room, io) {
+export function startNewMatch(room: Room, io: SocketIOServer): void {
     room.isPlaying = true;
     room.waitingForRestart = false;
     room.playersReady.clear();
@@ -56,7 +58,7 @@ function startNewMatch(room, io) {
     });
 }
 
-function checkRestartConditions(room, io) {
+export function checkRestartConditions(room: Room, io: SocketIOServer): void {
     balanceTeams(room, io);
 
     const hasRedPlayers = room.teams.red.length > 0;
@@ -75,7 +77,7 @@ function checkRestartConditions(room, io) {
     }
 }
 
-function updateTimer(room, io) {
+export function updateTimer(room: Room, io: SocketIOServer): void {
     if (!room.isPlaying) {
         return;
     }
@@ -105,9 +107,3 @@ function updateTimer(room, io) {
 
     io.to(room.id).emit('timerUpdate', { matchTime: room.matchTime });
 }
-
-module.exports = {
-    startNewMatch,
-    checkRestartConditions,
-    updateTimer,
-};

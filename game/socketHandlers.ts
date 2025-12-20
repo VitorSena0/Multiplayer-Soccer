@@ -1,14 +1,16 @@
 // Importa constantes e funções auxiliares do jogo
-const { MAX_PLAYERS_PER_ROOM } = require('./constants');
-const { allocateRoom, buildGameState, cleanupRoomIfEmpty } = require('./roomManager');
-const { checkRestartConditions, startNewMatch } = require('./match');
+import { Server as SocketIOServer, Socket } from 'socket.io';
+import { MAX_PLAYERS_PER_ROOM } from './constants';
+import { allocateRoom, buildGameState, cleanupRoomIfEmpty } from './roomManager';
+import { checkRestartConditions, startNewMatch } from './match';
+import { PlayerInput } from './types';
 
 // Registra todos os handlers de eventos do Socket.IO relacionados ao jogo
-function registerSocketHandlers(io) {
+export function registerSocketHandlers(io: SocketIOServer): void {
     // Dispara sempre que um novo cliente se conecta ao servidor
-    io.on('connection', (socket) => {
+    io.on('connection', (socket: Socket) => {
         // ID da sala requisitada pelo cliente (via query string), se existir
-        const requestedRoomId = socket.handshake.query?.roomId;
+        const requestedRoomId = socket.handshake.query?.roomId as string | undefined;
 
         // Aloca o jogador em uma sala (nova ou existente)
         const allocation = allocateRoom(requestedRoomId);
@@ -23,7 +25,7 @@ function registerSocketHandlers(io) {
             return;
         }
 
-        const room = allocation.room;
+        const room = allocation.room!;
 
         // Adiciona o socket à sala do Socket.IO e guarda o ID da sala nos dados do socket
         socket.join(room.id);
@@ -32,7 +34,7 @@ function registerSocketHandlers(io) {
         // Define o time do jogador tentando balancear a quantidade entre vermelho e azul
         const redCount = room.teams.red.length;
         const blueCount = room.teams.blue.length;
-        const team = redCount <= blueCount ? 'red' : 'blue';
+        const team: 'red' | 'blue' = redCount <= blueCount ? 'red' : 'blue';
         room.teams[team].push(socket.id);
 
         // Cria o estado inicial do jogador dentro da sala
@@ -113,7 +115,7 @@ function registerSocketHandlers(io) {
         });
 
         // Atualiza a entrada de movimento do jogador (teclas pressionadas)
-        socket.on('input', (input) => {
+        socket.on('input', (input: PlayerInput) => {
             if (room.players[socket.id] && room.isPlaying) {
                 room.players[socket.id].input = input;
             }
@@ -150,7 +152,3 @@ function registerSocketHandlers(io) {
         });
     });
 }
-
-module.exports = {
-    registerSocketHandlers,
-};
