@@ -1,7 +1,9 @@
 # Multiplayer Soccer
 
-Jogo de futebol **multiplayer 2D em tempo real** construído com **Node.js**, **Express** e **Socket.IO**.  
+Jogo de futebol **multiplayer 2D em tempo real** construído com **Node.js**, **Express**, **Socket.IO** e **TypeScript**.  
 O servidor simula a física básica do jogo (movimentação, colisão jogador x bola, cantos, gols) e transmite o estado oficial para todos os clientes conectados, garantindo que todos vejam a mesma partida.
+
+> **📝 Nota sobre TypeScript**: Este projeto foi completamente refatorado de JavaScript para TypeScript para melhorar a manutenibilidade do código e proporcionar uma melhor experiência de desenvolvimento com tipagem estática. Todos os arquivos `.js` foram convertidos para `.ts` com tipos bem definidos para variáveis, funções e estruturas de dados.
 
 ---
 
@@ -88,15 +90,17 @@ Para testar localmente, veja a seção [Instalação e Execução Local](#instal
 
 ## Tecnologias Utilizadas
 
-- **Linguagem**: JavaScript (Node.js no back-end e JS puro no front-end).
+- **Linguagem**: TypeScript (compilado para JavaScript)
 - **Servidor**:
 	- Node.js 18+
 	- Express
 	- Socket.IO
+	- TypeScript
 - **Cliente**:
 	- HTML5
 	- CSS3
-	- JavaScript (Canvas / DOM)
+	- TypeScript (compilado para JavaScript)
+	- Canvas / DOM
 - **Infra / Deploy**:
 	- Docker / Docker Compose
 	- Nginx (como proxy reverso)
@@ -133,10 +137,21 @@ Na raiz do projeto:
 # Instalar dependências
 npm install
 
+# Compilar o TypeScript
+npm run build
+
 # Executar o servidor
 npm run start
-# ou
-node game-server.js
+```
+
+Ou para desenvolvimento:
+
+```bash
+# Instalar dependências
+npm install
+
+# Executar em modo desenvolvimento (com ts-node)
+npm run dev
 ```
 
 O servidor, por padrão, escuta em `PORT` (se definida) ou `3000`.
@@ -151,7 +166,7 @@ O front-end é servido automaticamente a partir da pasta `public/`.
 
 ## Salas, Times e Balanceamento
 
-A lógica de salas está em `game/roomManager.js`.
+A lógica de salas está em `game/roomManager.ts`.
 
 - Cada sala comporta até **6 jogadores simultâneos** (`MAX_PLAYERS_PER_ROOM`).
 - Ao acessar o jogo sem parâmetros (`/`), o servidor:
@@ -169,23 +184,22 @@ A lógica de salas está em `game/roomManager.js`.
 	- Emite o evento `roomFull` para o cliente.
 	- Encerra a conexão para evitar sobrecarga.
 
-**Balanceamento de times**:
-
-- O servidor tenta manter a diferença de jogadores entre os times `red` e `blue` em **no máximo 1**.
-- Quando necessário, jogadores podem ser realocados de um time para outro (lógica em `game/match.js`).
+- **Balanceamento de times**:
+	- O servidor tenta manter a diferença de jogadores entre os times `red` e `blue` em **no máximo 1**.
+	- Quando necessário, jogadores podem ser realocados de um time para outro (lógica em `game/match.ts`).
 
 ---
 
 ## Regras de Partida e Temporizador
 
-A lógica de partida está em `game/match.js`:
+A lógica de partida está em `game/match.ts`:
 
 - **Início/Reinício de partida**:
 	- A partida é iniciada quando há ao menos um jogador em cada time.
 	- Ao reiniciar, o servidor:
 		- Zera o cronômetro.
 		- Reseta posições de todos os jogadores.
-		- Chama `resetBall` para reposicionar a bola (ver `game/ball.js`).
+		- Chama `resetBall` para reposicionar a bola (ver `game/ball.ts`).
 - **Temporizador**:
 	- Atualizado pela função `updateTimer(room, io)` a cada 1 segundo.
 	- Emite o evento `timerUpdate` com `matchTime` para todos da sala.
@@ -209,7 +223,7 @@ Os arquivos do cliente estão em `public/`:
 
 - `public/index.html` — página principal do jogo.
 - `public/style.css` — estilos do campo, HUD, botões, etc.
-- `public/game.js` — lógica do cliente:
+- `public/game.ts` — lógica do cliente em TypeScript (compilada para `public/dist/game.js`):
 	- Conecta ao Socket.IO do servidor.
 	- Envia inputs (teclas pressionadas) para o servidor.
 	- Renderiza o campo, jogadores, bola, placar e cronômetro.
@@ -217,19 +231,20 @@ Os arquivos do cliente estão em `public/`:
 		- Snapshot de estado do jogo.
 		- Atualizações de timer.
 		- Mensagens de sala cheia, início/fim de partida, etc.
+	- Utiliza tipagem forte para garantir segurança de tipos nas interfaces de comunicação.
 
 ---
 
 ## Backend (servidor de jogo)
 
-Ponto de entrada: `game-server.js`.
+Ponto de entrada: `game-server.ts` (compilado para `dist/game-server.js`).
 
 Responsabilidades principais:
 
 - Criar o servidor HTTP (`http.createServer(app)`).
-- Plugar o Socket.IO (`const io = socketio(server, { ... })`).
+- Plugar o Socket.IO (`const io = new SocketIOServer(server, { ... })`).
 - Servir arquivos estáticos da pasta `public/` via Express.
-- Registrar os handlers de Socket.IO (`game/socketHandlers.js`).
+- Registrar os handlers de Socket.IO (`game/socketHandlers.ts`).
 - Executar o game loop e o timer:
 
 	- `runGameLoops()`:
@@ -241,10 +256,13 @@ Responsabilidades principais:
 
 Outros módulos importantes:
 
-- `game/constants.js` — constantes de jogo (tamanhos, duração, limites).
-- `game/roomManager.js` — criação, alocação e limpeza de salas.
-- `game/match.js` — temporizador, início/fim de partida, balanceamento de times.
-- `game/ball.js` — estado e reposicionamento da bola, cantos.
+- `game/types.ts` — definições de tipos TypeScript para todas as estruturas do jogo (Room, Player, Ball, etc.).
+- `game/constants.ts` — constantes de jogo (tamanhos, duração, limites).
+- `game/roomManager.ts` — criação, alocação e limpeza de salas com tipos bem definidos.
+- `game/match.ts` — temporizador, início/fim de partida, balanceamento de times.
+- `game/ball.ts` — estado e reposicionamento da bola, cantos.
+- `game/gameLoop.ts` — lógica central de atualização a cada tick.
+- `game/socketHandlers.ts` — mapeamento de eventos Socket.IO (conexão, desconexão, inputs, "jogar novamente" etc.) com tipagem forte.
 - `game/gameLoop.js` — lógica central de atualização a cada tick.
 - `game/socketHandlers.js` — mapeamento de eventos Socket.IO (conexão, desconexão, inputs, “jogar novamente” etc.).
 
@@ -256,24 +274,33 @@ Estrutura simplificada do repositório:
 
 ```text
 Multiplayer-Soccer/
-├─ game-server.js         # Ponto de entrada do servidor Node/Express/Socket.IO
+├─ game-server.ts         # Ponto de entrada do servidor Node/Express/Socket.IO (TypeScript)
 ├─ package.json           # Metadados e scripts npm
+├─ tsconfig.json          # Configuração TypeScript para o servidor
+├─ tsconfig.client.json   # Configuração TypeScript para o cliente
 ├─ dockerfile             # Dockerfile do app Node
 ├─ docker-compose.yml     # Compose para subir app + nginx
 ├─ README.md              # Este arquivo
 │
-├─ game/                  # Lado servidor: lógica de jogo
-│  ├─ constants.js
-│  ├─ roomManager.js
-│  ├─ match.js
-│  ├─ ball.js
-│  ├─ gameLoop.js
-│  └─ socketHandlers.js
+├─ game/                  # Lado servidor: lógica de jogo (TypeScript)
+│  ├─ types.ts
+│  ├─ constants.ts
+│  ├─ roomManager.ts
+│  ├─ match.ts
+│  ├─ ball.ts
+│  ├─ gameLoop.ts
+│  └─ socketHandlers.ts
+│
+├─ dist/                  # Código JavaScript compilado do servidor
+│  ├─ game-server.js
+│  └─ game/
 │
 ├─ public/                # Lado cliente (front-end)
 │  ├─ index.html
 │  ├─ style.css
-│  └─ game.js
+│  ├─ game.ts            # Código TypeScript do cliente
+│  └─ dist/              # Código JavaScript compilado do cliente
+│     └─ game.js
 │
 ├─ nginx/                 # Configuração Nginx para proxy reverso
 │  ├─ default.conf
@@ -294,11 +321,16 @@ O arquivo `dockerfile` na raiz contém algo como:
 FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --only=production
-COPY . .
+RUN npm install
+COPY tsconfig*.json ./
+COPY game-server.ts ./
+COPY game ./game
+COPY public ./public
+RUN npm run build
+RUN npm prune --production
 ENV PORT=3000
 EXPOSE 3000
-CMD ["node", "game-server.js"]
+CMD ["node", "dist/game-server.js"]
 ```
 
 **Build da imagem:**
