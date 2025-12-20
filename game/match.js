@@ -62,8 +62,33 @@ function checkRestartConditions(room, io) {
     const hasRedPlayers = room.teams.red.length > 0;
     const hasBluePlayers = room.teams.blue.length > 0;
 
+    // Clean up playersReady to remove disconnected players
+    const allPlayerIds = [...room.teams.red, ...room.teams.blue];
+    room.playersReady.forEach((playerId) => {
+        if (!allPlayerIds.includes(playerId)) {
+            room.playersReady.delete(playerId);
+        }
+    });
+
     if (hasRedPlayers && hasBluePlayers) {
-        if (!room.isPlaying && !room.waitingForRestart) {
+        // If we're waiting for restart, check if we should reset or start
+        if (room.waitingForRestart) {
+            // Check if any current player was NOT in the ready set before cleanup
+            // This indicates a new player joined, so we should start fresh
+            const hasNewPlayers = allPlayerIds.some((id) => !room.playersReady.has(id));
+            
+            if (hasNewPlayers) {
+                // New player(s) joined during restart phase, start fresh match
+                startNewMatch(room, io);
+            } else {
+                // All current players are from the previous match and ready
+                const allReady = allPlayerIds.length > 0 && allPlayerIds.every((id) => room.playersReady.has(id));
+                if (allReady) {
+                    startNewMatch(room, io);
+                }
+            }
+        } else if (!room.isPlaying) {
+            // Not waiting for restart and not playing, start a new match
             startNewMatch(room, io);
         }
     } else {
